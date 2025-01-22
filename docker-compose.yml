@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: tutoring-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: tutoring_db
+      MYSQL_USER: tutoring_user
+      MYSQL_PASSWORD: tutoring_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - tutoring-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: tutoring-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - tutoring-network
+
+  spring-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: tutoring-backend
+    depends_on:
+      - mysql
+    ports:
+      - "8080:8080"
+      - "35729:35729"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/tutoring_db
+      SPRING_DATASOURCE_USERNAME: tutoring_user
+      SPRING_DATASOURCE_PASSWORD: tutoring_password
+      SPRING_DEVTOOLS_REMOTE_SECRET: mysecret
+    volumes:
+      - .:/app
+      - maven-repo:/root/.m2
+    networks:
+      - tutoring-network
+
+volumes:
+  mysql_data:
+  maven-repo:
+
+networks:
+  tutoring-network:
+    driver: bridge
