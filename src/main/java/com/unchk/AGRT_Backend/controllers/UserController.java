@@ -1,6 +1,9 @@
 package com.unchk.AGRT_Backend.controllers;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,28 +57,90 @@ public class UserController {
     })
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/all")
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
+    public ResponseEntity<?> getAllUsers() {
+        try {
+            List<UserDTO> users = userService.getAllUsers();
+            return ResponseEntity.ok(users);
+        } catch (UserServiceException e) {
+            // Récupérer le message et le code d'erreur de l'exception
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", e.getMessage());
+            errorResponse.put("status", e.getStatus().value());
 
-        List<UserDTO> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
+            // Retourner une réponse avec le code d'erreur approprié
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(errorResponse);
+        } catch (Exception e) {
+            // Gestion des exceptions inattendues
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", "Une erreur inattendue est survenue");
+            errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
     }
 
     @Operation(summary = "Récupérer tous les administrateurs", description = "Retourne une liste de tous les utilisateurs avec le rôle administrateur", responses = {
             @ApiResponse(responseCode = "200", description = "Liste des administrateurs récupérée avec succès", content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = UserDTO.class))))
     })
     @GetMapping("/admins")
-    public ResponseEntity<List<UserDTO>> getAllAdmins() {
-        List<UserDTO> users = userService.getAllAdmins();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<?> getAllAdmins() {
+        try {
+            List<UserDTO> users = userService.getAllAdmins();
+            return ResponseEntity.ok(users);
+        } catch (UserServiceException e) {
+            // Récupérer le message et le code d'erreur de l'exception
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", e.getMessage());
+            errorResponse.put("status", e.getStatus().value());
+
+            // Retourner une réponse avec le code d'erreur approprié
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(errorResponse);
+        } catch (Exception e) {
+            // Gestion des exceptions inattendues
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", "Une erreur inattendue est survenue");
+            errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
     }
 
     @Operation(summary = "Récupérer tous les candidats", description = "Retourne une liste de tous les utilisateurs avec le rôle candidat", responses = {
             @ApiResponse(responseCode = "200", description = "Liste des candidats récupérée avec succès", content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = UserDTO.class))))
     })
     @GetMapping("/candidates")
-    public ResponseEntity<List<UserDTO>> getAllCandidates() {
-        List<UserDTO> candidates = userService.getAllCandidates();
-        return ResponseEntity.ok(candidates);
+    public ResponseEntity<?> getAllCandidates() {
+        try {
+            List<UserDTO> candidates = userService.getAllCandidates();
+            return ResponseEntity.ok(candidates);
+        } catch (UserServiceException e) {
+            // Récupérer le message et le code d'erreur de l'exception
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", e.getMessage());
+            errorResponse.put("status", e.getStatus().value());
+
+            // Retourner une réponse avec le code d'erreur approprié
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(errorResponse);
+        } catch (Exception e) {
+            // Gestion des exceptions inattendues
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", "Une erreur inattendue est survenue");
+            errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
     }
 
     @Operation(summary = "Récupérer un utilisateur par ID", description = "Retourne les détails d'un utilisateur spécifique en utilisant son identifiant", responses = {
@@ -83,10 +148,18 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
     @GetMapping("/{email}")
-    public ResponseEntity<UserDTO> getUserByEmail(
-            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email) {
-        UserDTO user = userService.getUserByEmail(email);
-        return ResponseEntity.ok(user);
+    public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
+        try {
+            UserDTO user = userService.getUserByEmail(email);
+            return ResponseEntity.ok(user);
+        } catch (UserServiceException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("erros", e.getMessage());
+            errorResponse.put("status", e.getStatus().value());
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(errorResponse);
+        }
     }
 
     @Operation(summary = "Mettre à jour un utilisateur", description = "Permet de mettre à jour les informations d'un utilisateur existant", responses = {
@@ -94,11 +167,11 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Données de mise à jour invalides"),
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(
-            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email,
+    @PutMapping("/{email}")
+    public ResponseEntity<UserDTO> updateUser(
+            @Parameter(name = "Email de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email,
             @Parameter(name = "Données de mise à jour", description = "Nouvelles informations de l'utilisateur", required = true) @Valid @RequestBody UserRequestDTO request) {
-        User updatedUser = userService.updateUser(email, request);
+        UserDTO updatedUser = userService.updateUser(email, request);
         return ResponseEntity.ok(updatedUser);
     }
 
@@ -106,7 +179,7 @@ public class UserController {
             @ApiResponse(responseCode = "204", description = "Utilisateur supprimé avec succès"),
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{email}")
     public ResponseEntity<Void> deleteUser(
             @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email) {
         userService.deleteUser(email);

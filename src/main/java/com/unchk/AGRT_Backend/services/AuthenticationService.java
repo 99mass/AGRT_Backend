@@ -41,7 +41,7 @@ public class AuthenticationService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         String token = Jwts.builder()
-                .setSubject(user.getId().toString())
+                .setSubject(user.getEmail())
                 .claim("email", user.getEmail())
                 .claim("role", user.getRole().toString())
                 .setIssuedAt(new Date())
