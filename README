@@ -7,6 +7,12 @@ Ensuite, ouvrez votre terminal et allez à la racine du projet. Exécutez les co
 - `docker-compose up --build` pour exécuter le code.
 - `docker-compose down` pour arrêter le code.
 
+## Base de Mysql
 La base de données phpMyAdmin est accessible via `http://localhost:8081/`
 - Nom d'utilisateur : `tutoring_user`
 - Mot de passe : `tutoring_password`
+
+## Documentation Swagger
+```
+http://localhost:8080/swagger-ui/index.html#/
+```

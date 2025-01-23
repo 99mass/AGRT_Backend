@@ -13,8 +13,14 @@ import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 import com.unchk.AGRT_Backend.models.User;
 import com.unchk.AGRT_Backend.services.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Parameter;
+
 import jakarta.validation.Valid;
 
+@Tag(name = "Gestion des Utilisateurs", description = "Points d'accès pour la gestion des utilisateurs")
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "*")
@@ -25,8 +31,17 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    // @PostMapping
+    // public ResponseEntity<String> createUser(@Valid @RequestBody UserRequestDTO
+    // request) {
+
+    @Operation(summary = "Créer un nouvel utilisateur", description = "Point d'accès pour l'enregistrement d'un nouvel utilisateur dans le système", responses = {
+            @ApiResponse(responseCode = "201", description = "Utilisateur créé avec succès"),
+            @ApiResponse(responseCode = "400", description = "Données utilisateur invalides")
+    })
     @PostMapping
-    public ResponseEntity<String> createUser(@Valid @RequestBody UserRequestDTO request) {
+    public ResponseEntity<String> createUser(
+            @Parameter(description = "Détails de l'inscription de l'utilisateur", required = true) @Valid @RequestBody UserRequestDTO request) {
         try {
             userService.createUser(request);
             return new ResponseEntity<>(CREATED, HttpStatus.CREATED);
