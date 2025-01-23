@@ -13,21 +13,27 @@ import com.unchk.AGRT_Backend.dto.UserDTO;
 import com.unchk.AGRT_Backend.dto.UserRequestDTO;
 import com.unchk.AGRT_Backend.enums.UserRole;
 import com.unchk.AGRT_Backend.exceptions.ErrorMessages;
-import com.unchk.AGRT_Backend.exceptions.ForbiddenException;
+import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 import com.unchk.AGRT_Backend.models.User;
 import com.unchk.AGRT_Backend.repositories.UserRepository;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.IOException;
 
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+    final String FORBIDDEN_MESSAGE = "Seuls les administrateurs peuvent créer des comptes administrateurs.";
+    final String INVALID_ROLE = "Le rôle doit être soit 'CANDIDATE' soit 'ADMIN'";
 
     @Autowired
     private UserRepository userRepository;
@@ -38,50 +44,72 @@ public class UserService {
     @Autowired
     private JwtProperties jwtProperties;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     @Transactional
     public UserDTO createUser(UserRequestDTO request) {
-        validateUserRequest(request);
+        try {
+            validateUserRequest(request);
+        } catch (RuntimeException e) {
+            throw new UserServiceException(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
 
         if (userRepository.existsByEmail(request.getEmail())) {
+
             Map<String, Object> response = new HashMap<>();
-            Map<String, String> errors = new HashMap<>();
-            errors.put("message", ErrorMessages.EMAIL_ALREADY_EXISTS.getMessage());
             response.put("status", HttpStatus.BAD_REQUEST.value());
-            response.put("errors", errors);
+            response.put("errors", ErrorMessages.EMAIL_ALREADY_EXISTS.getMessage());
             throw new RuntimeException(response.toString());
         }
 
+        UserRole requestedRole = request.getRole();
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String currentUserRole = "ANONYMOUS";
+        String currentUserRole = "CANDIDATE";
 
-        if (authentication != null && authentication.isAuthenticated() &&
-                authentication.getCredentials() instanceof String) {
-            try {
-                String token = (String) authentication.getCredentials();
-                Claims claims = Jwts.parserBuilder()
-                        .setSigningKey(jwtProperties.getSecretKey())
-                        .build()
-                        .parseClaimsJws(token)
-                        .getBody();
-                currentUserRole = claims.get("role", String.class);
-            } catch (Exception e) {
-                System.err.println("Error parsing JWT token: " + e.getMessage());
+        if (requestedRole == UserRole.ADMIN && authentication != null && authentication.isAuthenticated()) {
+            String token = null;
+            if (authentication.getCredentials() instanceof String) {
+                token = (String) authentication.getCredentials();
+            }
+
+            if (token != null) {
+                try {
+                    Claims claims = Jwts.parserBuilder()
+                            .setSigningKey(jwtProperties.getSecretKey())
+                            .build()
+                            .parseClaimsJws(token)
+                            .getBody();
+                    currentUserRole = claims.get("role", String.class);
+                } catch (Exception e) {
+                    throw new UserServiceException(FORBIDDEN_MESSAGE, HttpStatus.FORBIDDEN);
+                }
+            } else {
+                throw new UserServiceException(FORBIDDEN_MESSAGE, HttpStatus.FORBIDDEN);
             }
         }
 
-        UserRole requestedRole = request.getRole() != null ? request.getRole() : UserRole.CANDIDATE;
-
         if (requestedRole == UserRole.ADMIN && !currentUserRole.equals("ADMIN")) {
             Map<String, Object> response = new HashMap<>();
-            Map<String, String> errors = new HashMap<>();
-            errors.put("message", "Only administrators can create admin accounts");
             response.put("status", HttpStatus.FORBIDDEN.value());
-            response.put("errors", errors);
-            throw new ForbiddenException(response.toString());
+            response.put("errors", FORBIDDEN_MESSAGE);
+
+            throw new UserServiceException(response.toString(), HttpStatus.FORBIDDEN);
         }
 
+        String profilePicturePath = null;
         if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
-            validateProfilePicture(request.getProfilePicture());
+            try {
+                profilePicturePath = fileStorageService.storeFile(
+                        request.getProfilePicture(),
+                        request.getEmail() + "_profile.jpg");
+            } catch (IOException e) {
+                throw new UserServiceException("Erreur lors de la sauvegarde de l'image: " + e.getMessage(),
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            } catch (Exception e) {
+                throw new UserServiceException("Erreur inattendue lors de la sauvegarde de l'image: " + e.getMessage(),
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
 
         try {
@@ -90,12 +118,19 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setFirstName(request.getFirstName());
             user.setLastName(request.getLastName());
-            user.setProfilePicture(request.getProfilePicture());
+            user.setProfilePicture(profilePicturePath);
             user.setRole(requestedRole);
             User savedUser = userRepository.save(user);
             return UserDTO.class.cast(new UserDTO().toDTO(savedUser));
         } catch (Exception e) {
-            throw new RuntimeException("Error creating user");
+            if (profilePicturePath != null) {
+                try {
+                    fileStorageService.deleteFile(profilePicturePath);
+                } catch (Exception ex) {
+                }
+            }
+            throw new UserServiceException("Erreur lors de la création de l'utilisateur",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -105,16 +140,25 @@ public class UserService {
             String base64Data = parts.length > 1 ? parts[1] : parts[0];
             byte[] imageBytes = Base64.getDecoder().decode(base64Data);
             if (imageBytes.length > MAX_IMAGE_SIZE) {
-                throw new RuntimeException("IMAGE_TOO_LARGE");
+                throw new UserServiceException(ErrorMessages.IMAGE_TOO_LARGE.getMessage(), HttpStatus.BAD_REQUEST);
             }
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("INVALID_IMAGE_FORMAT");
+            throw new UserServiceException(ErrorMessages.INVALID_IMAGE_FORMAT.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
 
     public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
+                        HttpStatus.NOT_FOUND));
+        return user;
+    }
+
+    public UserDTO getUserById(String id) {
+        User user = userRepository.findById(UUID.fromString(id))
+                .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
+                        HttpStatus.NOT_FOUND));
+        return new UserDTO().toDTO(user);
     }
 
     @Transactional
@@ -122,7 +166,7 @@ public class UserService {
         User user = getUserByEmail(email);
 
         if (!email.equals(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("EMAIL_ALREADY_EXISTS");
+            throw new UserServiceException(ErrorMessages.EMAIL_ALREADY_EXISTS.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
         if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
@@ -146,37 +190,54 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    public List<UserDTO> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        return users.stream().map(user -> new UserDTO().toDTO(user)).collect(Collectors.toList());
+    }
+
+    public List<UserDTO> getAllAdmins() {
+        List<User> candidates = userRepository.findByRole(UserRole.ADMIN);
+        return candidates.stream().map(user -> new UserDTO().toDTO(user)).collect(Collectors.toList());
+    }
+
+    public List<UserDTO> getAllCandidates() {
+        List<User> candidates = userRepository.findByRole(UserRole.CANDIDATE);
+        return candidates.stream().map(user -> new UserDTO().toDTO(user)).collect(Collectors.toList());
+    }
+
     private void validateUserRequest(UserRequestDTO request) {
         Map<String, Object> response = new HashMap<>();
-        Map<String, String> errors = new HashMap<>();
-        String message = null;
+        String errors = new String();
 
         if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
-            message = ErrorMessages.REQUIRED_EMAIL.getMessage();
+            errors = (ErrorMessages.REQUIRED_EMAIL.getMessage());
+        } else if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            errors = ErrorMessages.INVALID_EMAIL_FORMAT.getMessage();
         }
-        if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-            message = ErrorMessages.INVALID_EMAIL_FORMAT.getMessage();
-        }
+
         if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
-            message = ErrorMessages.REQUIRED_PASSWORD.getMessage();
+            errors = ErrorMessages.REQUIRED_PASSWORD.getMessage();
+        } else if (request.getPassword().length() < 6) {
+            errors = ErrorMessages.PASSWORD_TOO_SHORT.getMessage();
         }
-        if (request.getPassword() != null && request.getPassword().length() < 6) {
-            message = ErrorMessages.PASSWORD_TOO_SHORT.getMessage();
 
-        }
         if (request.getFirstName() == null || request.getFirstName().trim().isEmpty()) {
-            message = ErrorMessages.REQUIRED_FIRSTNAME.getMessage();
+            errors = ErrorMessages.REQUIRED_FIRSTNAME.getMessage();
         }
+
         if (request.getLastName() == null || request.getLastName().trim().isEmpty()) {
-            message = ErrorMessages.REQUIRED_LASTNAME.getMessage();
+            errors = ErrorMessages.REQUIRED_LASTNAME.getMessage();
         }
 
-        errors.put("message", message);
-        response.put("status", HttpStatus.BAD_REQUEST.value());
-        response.put("errors", errors);
+        if (request.getRole() == null
+                || !(request.getRole().equals(UserRole.CANDIDATE) || request.getRole().equals(UserRole.ADMIN))) {
+            errors = INVALID_ROLE;
+        }
 
-        if (message != null && !message.isEmpty()) {
-            throw new RuntimeException(response.toString());
+        if (!errors.isEmpty()) {
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("errors", errors);
+            throw new UserServiceException(response.toString(), HttpStatus.BAD_REQUEST);
         }
     }
 

@@ -12,12 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.unchk.AGRT_Backend.services.AuthenticationService;
 
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthenticationController {
@@ -34,17 +32,13 @@ public class AuthenticationController {
             return ResponseEntity.ok(token);
         } catch (BadCredentialsException e) {
             Map<String, Object> response = new HashMap<>();
-            Map<String, String> errors = new HashMap<>();
-            errors.put("message", "Email ou mot de passe incorrect");
             response.put("status", HttpStatus.UNAUTHORIZED.value());
-            response.put("errors", errors);
+            response.put("errors", "Email ou mot de passe incorrect");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
-            Map<String, String> errors = new HashMap<>();
-            errors.put("message", "Une erreur est survenue lors de l'authentification");
             response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-            response.put("errors", errors);
+            response.put("errors", "Une erreur est survenue lors de l'authentification");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
