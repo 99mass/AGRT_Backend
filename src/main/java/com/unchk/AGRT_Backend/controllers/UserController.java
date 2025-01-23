@@ -15,25 +15,25 @@ import com.unchk.AGRT_Backend.services.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Parameter;
-
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 
-@Tag(name = "Gestion des Utilisateurs", description = "Points d'accès pour la gestion des utilisateurs")
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "*")
+@Tag(name = "Gestion des Utilisateurs", description = "Points d'accès pour la gestion des utilisateurs")
+@SecurityRequirement(name = "bearerAuth")
 public class UserController {
 
     final String CREATED = "Utilisateur créé avec succès.";
 
     @Autowired
     private UserService userService;
-
-    // @PostMapping
-    // public ResponseEntity<String> createUser(@Valid @RequestBody UserRequestDTO
-    // request) {
 
     @Operation(summary = "Créer un nouvel utilisateur", description = "Point d'accès pour l'enregistrement d'un nouvel utilisateur dans le système", responses = {
             @ApiResponse(responseCode = "201", description = "Utilisateur créé avec succès"),
@@ -50,6 +50,10 @@ public class UserController {
         }
     }
 
+    @Operation(summary = "Récupérer tous les utilisateurs", description = "Retourne une liste complète de tous les utilisateurs du système", responses = {
+            @ApiResponse(responseCode = "200", description = "Liste des utilisateurs récupérée avec succès", content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = UserDTO.class))))
+    })
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/all")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
 
@@ -57,34 +61,55 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
+    @Operation(summary = "Récupérer tous les administrateurs", description = "Retourne une liste de tous les utilisateurs avec le rôle administrateur", responses = {
+            @ApiResponse(responseCode = "200", description = "Liste des administrateurs récupérée avec succès", content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = UserDTO.class))))
+    })
     @GetMapping("/admins")
     public ResponseEntity<List<UserDTO>> getAllAdmins() {
         List<UserDTO> users = userService.getAllAdmins();
         return ResponseEntity.ok(users);
     }
 
+    @Operation(summary = "Récupérer tous les candidats", description = "Retourne une liste de tous les utilisateurs avec le rôle candidat", responses = {
+            @ApiResponse(responseCode = "200", description = "Liste des candidats récupérée avec succès", content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = UserDTO.class))))
+    })
     @GetMapping("/candidates")
     public ResponseEntity<List<UserDTO>> getAllCandidates() {
         List<UserDTO> candidates = userService.getAllCandidates();
         return ResponseEntity.ok(candidates);
     }
 
+    @Operation(summary = "Récupérer un utilisateur par ID", description = "Retourne les détails d'un utilisateur spécifique en utilisant son identifiant", responses = {
+            @ApiResponse(responseCode = "200", description = "Utilisateur trouvé", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable String id) {
+    public ResponseEntity<UserDTO> getUserById(
+            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String id) {
         UserDTO user = userService.getUserById(id);
         return ResponseEntity.ok(user);
     }
 
+    @Operation(summary = "Mettre à jour un utilisateur", description = "Permet de mettre à jour les informations d'un utilisateur existant", responses = {
+            @ApiResponse(responseCode = "200", description = "Utilisateur mis à jour avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = User.class))),
+            @ApiResponse(responseCode = "400", description = "Données de mise à jour invalides")
+    })
     @PutMapping("/{email}")
     public ResponseEntity<User> updateUser(
-            @PathVariable String email,
-            @Valid @RequestBody UserRequestDTO request) {
+            @Parameter(name = "Email de l'utilisateur", description = "Email de l'utilisateur à mettre à jour", required = true) @PathVariable String email,
+
+            @Parameter(name = "Données de mise à jour", description = "Nouvelles informations de l'utilisateur", required = true) @Valid @RequestBody UserRequestDTO request) {
         User updatedUser = userService.updateUser(email, request);
         return ResponseEntity.ok(updatedUser);
     }
 
+    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son email", responses = {
+            @ApiResponse(responseCode = "204", description = "Utilisateur supprimé avec succès"),
+            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
+    })
     @DeleteMapping("/{email}")
-    public ResponseEntity<Void> deleteUser(@PathVariable String email) {
+    public ResponseEntity<Void> deleteUser(
+            @Parameter(name = "Email de l'utilisateur", description = "Email de l'utilisateur à supprimer", required = true) @PathVariable String email) {
         userService.deleteUser(email);
         return ResponseEntity.noContent().build();
     }
