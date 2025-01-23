@@ -109,7 +109,7 @@ public class UserService {
             } catch (IOException e) {
                 throw e;
             } catch (Exception e) {
-                throw new UserServiceException( e.getMessage(),
+                throw new UserServiceException(e.getMessage(),
                         HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
@@ -189,7 +189,7 @@ public class UserService {
                 throw new UserServiceException("Erreur d'authentification", HttpStatus.FORBIDDEN);
             }
         }
-       
+
         // Vérifier les permissions de mise à jour
         if (currentUserRole.equals("CANDIDATE") && !currentUserEmail.equals(email)) {
             throw new UserServiceException("Vous n'êtes pas autorisé à modifier ce compte", HttpStatus.FORBIDDEN);
@@ -323,6 +323,16 @@ public class UserService {
             if (currentUserEmail == null || !currentUserEmail.equals(email)) {
                 throw new UserServiceException("Vous n'êtes pas autorisé à supprimer ce compte", HttpStatus.FORBIDDEN);
             }
+
+            if (userToDelete.getProfilePicture() != null) {
+                try {
+                    fileStorageService.deleteFile(userToDelete.getProfilePicture());
+                } catch (Exception e) {
+                    // Log the error, but don't stop the deletion process
+                    System.err.println("Erreur lors de la suppression de l'image de profil : " + e.getMessage());
+                }
+            }
+
             userRepository.delete(userToDelete);
         } else {
             // Cas par défaut : accès non autorisé
