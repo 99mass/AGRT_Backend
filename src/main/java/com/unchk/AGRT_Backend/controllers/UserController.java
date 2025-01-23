@@ -1,7 +1,6 @@
 package com.unchk.AGRT_Backend.controllers;
 
 import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -83,33 +82,33 @@ public class UserController {
             @ApiResponse(responseCode = "200", description = "Utilisateur trouvé", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDTO.class))),
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUserById(
-            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String id) {
-        UserDTO user = userService.getUserById(id);
+    @GetMapping("/{email}")
+    public ResponseEntity<UserDTO> getUserByEmail(
+            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email) {
+        UserDTO user = userService.getUserByEmail(email);
         return ResponseEntity.ok(user);
     }
 
     @Operation(summary = "Mettre à jour un utilisateur", description = "Permet de mettre à jour les informations d'un utilisateur existant", responses = {
             @ApiResponse(responseCode = "200", description = "Utilisateur mis à jour avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = User.class))),
-            @ApiResponse(responseCode = "400", description = "Données de mise à jour invalides")
+            @ApiResponse(responseCode = "400", description = "Données de mise à jour invalides"),
+            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @PutMapping("/{email}")
+    @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(
-            @Parameter(name = "Email de l'utilisateur", description = "Email de l'utilisateur à mettre à jour", required = true) @PathVariable String email,
-
+            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email,
             @Parameter(name = "Données de mise à jour", description = "Nouvelles informations de l'utilisateur", required = true) @Valid @RequestBody UserRequestDTO request) {
         User updatedUser = userService.updateUser(email, request);
         return ResponseEntity.ok(updatedUser);
     }
 
-    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son email", responses = {
+    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son ID", responses = {
             @ApiResponse(responseCode = "204", description = "Utilisateur supprimé avec succès"),
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @DeleteMapping("/{email}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
-            @Parameter(name = "Email de l'utilisateur", description = "Email de l'utilisateur à supprimer", required = true) @PathVariable String email) {
+            @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email) {
         userService.deleteUser(email);
         return ResponseEntity.noContent().build();
     }

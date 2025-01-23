@@ -21,7 +21,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.IOException;
 
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +30,7 @@ import java.util.stream.Collectors;
 @Service
 public class UserService {
 
-    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+    // private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
     final String FORBIDDEN_MESSAGE = "Seuls les administrateurs peuvent créer des comptes administrateurs.";
     final String INVALID_ROLE = "Le rôle doit être soit 'CANDIDATE' soit 'ADMIN'";
 
@@ -134,28 +133,15 @@ public class UserService {
         }
     }
 
-    private void validateProfilePicture(String base64Image) {
-        try {
-            String[] parts = base64Image.split(",");
-            String base64Data = parts.length > 1 ? parts[1] : parts[0];
-            byte[] imageBytes = Base64.getDecoder().decode(base64Data);
-            if (imageBytes.length > MAX_IMAGE_SIZE) {
-                throw new UserServiceException(ErrorMessages.IMAGE_TOO_LARGE.getMessage(), HttpStatus.BAD_REQUEST);
-            }
-        } catch (IllegalArgumentException e) {
-            throw new UserServiceException(ErrorMessages.INVALID_IMAGE_FORMAT.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-
-    public User getUserByEmail(String email) {
+    public UserDTO getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
                         HttpStatus.NOT_FOUND));
-        return user;
+        return UserDTO.class.cast(new UserDTO().toDTO(user));
     }
 
-    public UserDTO getUserById(String id) {
-        User user = userRepository.findById(UUID.fromString(id))
+    public UserDTO getUserById(UUID id) {
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
                         HttpStatus.NOT_FOUND));
         return new UserDTO().toDTO(user);
@@ -163,16 +149,14 @@ public class UserService {
 
     @Transactional
     public User updateUser(String email, UserRequestDTO request) {
-        User user = getUserByEmail(email);
-
-        if (!email.equals(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(), 
+                        HttpStatus.NOT_FOUND));
+    
+        if (!user.getEmail().equals(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
             throw new UserServiceException(ErrorMessages.EMAIL_ALREADY_EXISTS.getMessage(), HttpStatus.BAD_REQUEST);
         }
-
-        if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
-            validateProfilePicture(request.getProfilePicture());
-        }
-
+    
         user.setEmail(request.getEmail());
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -180,13 +164,15 @@ public class UserService {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setProfilePicture(request.getProfilePicture());
-
+    
         return userRepository.save(user);
     }
-
+    
     @Transactional
     public void deleteUser(String email) {
-        User user = getUserByEmail(email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
+                        HttpStatus.NOT_FOUND));
         userRepository.delete(user);
     }
 
