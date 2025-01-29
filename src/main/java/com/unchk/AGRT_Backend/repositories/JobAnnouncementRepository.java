@@ -36,4 +36,6 @@ public interface JobAnnouncementRepository extends JpaRepository<JobAnnouncement
     // Rechercher les annonces qui expirent bientôt
     @Query("SELECT j FROM JobAnnouncement j WHERE j.status = 'PUBLISHED' AND j.closingDate BETWEEN CURRENT_TIMESTAMP AND :endDate")
     List<JobAnnouncement> findExpiringAnnouncements(LocalDateTime endDate);
+
+    boolean existsByTitleAndAcademicYear_Id(String title, UUID academicYearId);
 }
