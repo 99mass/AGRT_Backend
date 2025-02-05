@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 @Service
 public class UserService {
 
-    // private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
     final String FORBIDDEN_MESSAGE = "Seuls les administrateurs peuvent créer des comptes administrateurs.";
     final String INVALID_ROLE = "Le rôle doit être soit 'CANDIDATE' soit 'ADMIN'";
 
@@ -152,7 +151,6 @@ public class UserService {
         return new UserDTO().toDTO(user);
     }
 
-    @SuppressWarnings("null")
     @Transactional
     public UserDTO updateUser(String email, UserRequestDTO request) {
         // Récupérer l'utilisateur à mettre à jour

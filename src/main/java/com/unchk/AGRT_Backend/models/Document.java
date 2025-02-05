@@ -1,5 +1,6 @@
 package com.unchk.AGRT_Backend.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.unchk.AGRT_Backend.enums.DocumentStatus;
 import com.unchk.AGRT_Backend.enums.DocumentType;
 import lombok.AllArgsConstructor;
@@ -9,18 +10,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "documents")
@@ -34,6 +24,7 @@ public class Document {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_id", nullable = false)
+    @JsonIgnore
     private Application application;
 
     @Enumerated(EnumType.STRING)
@@ -41,10 +32,10 @@ public class Document {
     private DocumentType documentType;
 
     @Column(name = "file_name", nullable = false)
-    private String fileName;
+    private String fileName; // Nom original du fichier
 
     @Column(name = "file_path", nullable = false)
-    private String filePath;
+    private String filePath; // Chemin généré pour le stockage
 
     @Column(name = "file_size", nullable = false)
     private Integer fileSize;
@@ -59,6 +50,8 @@ public class Document {
     @Column(nullable = false)
     private DocumentStatus status;
 
+    private static final int MAX_FILE_SIZE = 10 * 1024 * 1024;
+
     @PrePersist
     protected void onCreate() {
         if (uploadDate == null) {
@@ -69,76 +62,46 @@ public class Document {
         }
     }
 
-    // Méthodes de validation
+
+    public void generateFilePath() {
+        if (application == null || application.getId() == null) {
+            throw new IllegalStateException("Application must be set before generating file path");
+        }
+
+        String announcementId = application.getAnnouncement().getId().toString();
+        String applicantId = application.getCandidate().getId().toString();
+        String extension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+
+        // Assurez-vous que l'ID du document est généré avant
+        if (this.getId() == null) {
+            // Générer un UUID temporaire si nécessaire
+            this.setId(UUID.randomUUID());
+        }
+
+        this.filePath = String.format("%s_%s_%s.%s",
+                announcementId,
+                applicantId,
+                this.getId().toString(),
+                extension);
+    }
+
     public boolean isValidFileSize() {
-        // Par exemple, limite de 10MB
-        return fileSize != null && fileSize <= 10 * 1024 * 1024;
+        return fileSize != null && fileSize <= MAX_FILE_SIZE;
     }
 
     public boolean isValidMimeType() {
-        // Types MIME autorisés selon le type de document
-        switch (documentType) {
-            case CV:
-            case MOTIVATION_LETTER:
-                return mimeType.equals("application/pdf") || 
-                       mimeType.equals("application/msword") ||
-                       mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            case DIPLOMA:
-                return mimeType.equals("application/pdf") ||
-                       mimeType.equals("image/jpeg") ||
-                       mimeType.equals("image/png");
-            case OTHER:
-                return mimeType.equals("application/pdf") ||
-                       mimeType.startsWith("image/") ||
-                       mimeType.equals("application/msword") ||
-                       mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            default:
-                return false;
-        }
-    }
-
-    // Méthodes utilitaires
-    public String getFileExtension() {
-        return fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
-    }
-
-    public void validate() {
-        if (!isValidFileSize() || !isValidMimeType()) {
-            this.status = DocumentStatus.INVALID;
-        } else {
-            this.status = DocumentStatus.VALID;
-        }
-    }
-
-    // Méthodes de manipulation de fichiers
-    public String generateStoragePath() {
-        return String.format("documents/%s/%s/%s-%s.%s",
-            application.getAcademicYear().getYearName(),
-            application.getId(),
-            documentType.name().toLowerCase(),
-            UUID.randomUUID(),
-            getFileExtension());
-    }
-
-    public boolean isImage() {
-        return mimeType != null && mimeType.startsWith("image/");
-    }
-
-    public boolean isPDF() {
         return "application/pdf".equals(mimeType);
     }
 
-    // Override equals et hashCode pour éviter les problèmes de JPA avec les collections
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Document document = (Document) o;
-        return id != null && id.equals(document.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
+    public void validate() {
+        if (!isValidFileSize()) {
+            this.status = DocumentStatus.INVALID;
+            throw new IllegalArgumentException("La taille du fichier dépasse la limite maximale de 10MB");
+        }
+        if (!isValidMimeType()) {
+            this.status = DocumentStatus.INVALID;
+            throw new IllegalArgumentException("Seuls les fichiers PDF sont acceptés");
+        }
+        this.status = DocumentStatus.VALID;
     }
 }

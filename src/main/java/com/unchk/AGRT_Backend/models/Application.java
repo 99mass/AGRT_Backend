@@ -1,5 +1,7 @@
 package com.unchk.AGRT_Backend.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.enums.ApplicationType;
 import com.unchk.AGRT_Backend.enums.DocumentStatus;
@@ -45,10 +47,12 @@ public class Application {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidate_id", nullable = false)
+    @JsonBackReference("candidate-applications")
     private User candidate;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "announcement_id", nullable = false)
+    @JsonBackReference("announcement-applications")
     private JobAnnouncement announcement;
 
     @Enumerated(EnumType.STRING)
@@ -73,6 +77,7 @@ public class Application {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("application-documents")
     private Set<Document> documents = new HashSet<>();
 
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)

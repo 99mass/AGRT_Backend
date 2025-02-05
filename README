@@ -16,3 +16,25 @@ La base de données phpMyAdmin est accessible via `http://localhost:8081/`
 ```
 http://localhost:8080/swagger-ui/index.html#/
 ```
+
+
+```
+{
+  "candidateId": "5d500db6-55a5-4341-9a06-3dddbb95da20",
+  "announcementId": "c0535d14-4a0f-4241-8236-cdf02a6632bb",
+  "academicYearId": "41875bde-e106-4a19-86ed-f1d26e731b9c",
+  "applicationType": "NEW",
+  "documents": [
+    {
+      "base64Content": "data:application/pdf;base64,...",
+      "originalFilename": "cv.pdf",
+      "documentType": "CV"
+    },
+    {
+      "base64Content": "data:application/pdf;base64,...",
+      "originalFilename": "motivation-letter.pdf",
+      "documentType": "MOTIVATION_LETTER"
+    }
+  ]
+}
+```
