@@ -17,6 +17,12 @@ La base de données phpMyAdmin est accessible via `http://localhost:8081/`
 http://localhost:8080/swagger-ui/index.html#/
 ```
 
+## Administrateur par défaut
+```
+email= admin@admin.com
+password= admin123
+```
+
 
 ```
 {
