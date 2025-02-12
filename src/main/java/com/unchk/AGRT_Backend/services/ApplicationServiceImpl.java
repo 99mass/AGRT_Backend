@@ -2,8 +2,10 @@ package com.unchk.AGRT_Backend.services;
 
 import com.unchk.AGRT_Backend.config.JwtProperties;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
+import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
 import com.unchk.AGRT_Backend.dto.DocumentDTO;
+import com.unchk.AGRT_Backend.dto.DocumentResponseDTO;
 import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.enums.DocumentType;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
@@ -21,8 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.nio.file.Path;
@@ -176,58 +180,83 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApplicationDTO getApplicationById(UUID id) {
-        Application application = applicationRepository.findById(id)
+    public ApplicationDetailDTO getApplicationByIdWithDocuments(UUID id) {
+
+        Application application = applicationRepository.findByIdWithDocuments(id)
                 .orElseThrow(() -> new UserServiceException("Candidature non trouvée", HttpStatus.NOT_FOUND));
-        return modelMapper.map(application, ApplicationDTO.class);
+
+        ApplicationDetailDTO dto = new ApplicationDetailDTO();
+
+        dto.setId(application.getId());
+        dto.setCandidateId(application.getCandidate().getId());
+        dto.setAnnouncementId(application.getAnnouncement().getId());
+        dto.setAcademicYearId(application.getAcademicYear().getId());
+        dto.setApplicationType(application.getApplicationType());
+        dto.setStatus(application.getStatus());
+        dto.setRejectionReason(application.getRejectionReason());
+        dto.setCreatedAt(application.getCreatedAt());
+        dto.setUpdatedAt(application.getUpdatedAt());
+
+        Set<DocumentResponseDTO> documentDTOs = application.getDocuments().stream()
+                .map(doc -> {
+                    DocumentResponseDTO docDTO = new DocumentResponseDTO();
+                    docDTO.setId(doc.getId());
+                    docDTO.setFileName(doc.getFileName());
+                    docDTO.setFilePath("/api/documents/" + doc.getFilePath());
+                    docDTO.setDocumentType(doc.getDocumentType());
+                    docDTO.setStatus(doc.getStatus());
+                    docDTO.setUploadDate(doc.getUploadDate());
+                    return docDTO;
+                })
+                .collect(Collectors.toSet());
+
+        dto.setDocuments(documentDTOs);
+
+        return dto;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ApplicationDTO> getAllApplications() {
-        return applicationRepository.findAll().stream()
-                .map(app -> modelMapper.map(app, ApplicationDTO.class))
+    public List<ApplicationDetailDTO> getApplicationsByAnnouncementWithDocuments(UUID announcementId) {
+        List<Application> applications = applicationRepository.findByAnnouncementId(announcementId);
+        return applications.stream()
+                .map(this::convertToApplicationDetailDTO)
                 .collect(Collectors.toList());
+    }
+
+    private ApplicationDetailDTO convertToApplicationDetailDTO(Application application) {
+        ApplicationDetailDTO dto = modelMapper.map(application, ApplicationDetailDTO.class);
+
+        // Convertir les documents
+        Set<DocumentResponseDTO> documentDTOs = application.getDocuments().stream()
+                .map(doc -> {
+                    DocumentResponseDTO docDTO = modelMapper.map(doc, DocumentResponseDTO.class);
+                    // Ne pas inclure le chemin complet du fichier pour des raisons de sécurité
+                    docDTO.setFilePath("/api/documents/" + doc.getFilePath());
+                    return docDTO;
+                })
+                .collect(Collectors.toSet());
+
+        dto.setDocuments(documentDTOs);
+        return dto;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ApplicationDTO> getApplicationsByCandidate(UUID candidateId) {
-        return applicationRepository.findByCandidateId(candidateId).stream()
-                .map(app -> modelMapper.map(app, ApplicationDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ApplicationDTO> getApplicationsByAnnouncement(UUID announcementId) {
-        return applicationRepository.findByAnnouncementId(announcementId).stream()
-                .map(app -> modelMapper.map(app, ApplicationDTO.class))
-                .collect(Collectors.toList());
-    }
-
     @Transactional
     public void addDocumentToApplication(UUID applicationId, String base64File, String originalFilename,
             DocumentType documentType) {
-        Application application;
         try {
-            application = applicationRepository.findById(applicationId)
+
+            Application application = applicationRepository.findById(applicationId)
                     .orElseThrow(() -> new UserServiceException("Candidature non trouvée", HttpStatus.NOT_FOUND));
-        } catch (UserServiceException e) {
-            throw new UserServiceException("Candidature non trouvée", HttpStatus.NOT_FOUND);
-        }
 
-        if (!application.canBeUpdated()) {
-            throw new UserServiceException("La candidature ne peut plus être modifiée", HttpStatus.BAD_REQUEST);
-        }
+            if (!application.canBeUpdated()) {
+                throw new UserServiceException("La candidature ne peut plus être modifiée", HttpStatus.BAD_REQUEST);
+            }
 
-        try {
-            // Décoder le contenu base64
             String[] parts = base64File.split(",");
             String base64Content = parts.length > 1 ? parts[1] : parts[0];
             byte[] fileContent = Base64.getDecoder().decode(base64Content);
 
-            // Créer le document
             Document document = new Document();
             document.setApplication(application);
             document.setDocumentType(documentType);
@@ -235,32 +264,29 @@ public class ApplicationServiceImpl implements ApplicationService {
             document.setFileSize(fileContent.length);
             document.setMimeType("application/pdf");
 
-            // Générer le chemin du fichier AVANT de sauvegarder
+            document.validate();
+
             document.generateFilePath();
 
-            // Sauvegarder le document
-            document = documentRepository.save(document);
+            String fileName = document.getFilePath().contains("/")
+                    ? document.getFilePath().substring(document.getFilePath().lastIndexOf("/") + 1)
+                    : document.getFilePath();
+            document.setFilePath(fileName);
 
-            // Vérifier et créer le répertoire si nécessaire
+            application.addDocument(document);
+
             Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Files.createDirectories(uploadPath);
 
-            // Sauvegarder le fichier physiquement
-            Path filePath = uploadPath.resolve(document.getFilePath());
+            Path filePath = uploadPath.resolve(fileName);
             Files.write(filePath, fileContent);
 
-            // Validation du document
-            try {
-                document.validate();
-            } catch (IllegalArgumentException e) {
-                // En cas d'erreur, supprimer le fichier physique
-                Files.deleteIfExists(filePath);
-                throw new UserServiceException(e.getMessage(), HttpStatus.BAD_REQUEST);
-            }
+            applicationRepository.save(application);
+
         } catch (IOException e) {
             throw new UserServiceException("Erreur lors de l'upload du document", HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (IllegalArgumentException e) {
+            throw new UserServiceException(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -282,11 +308,10 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         try {
-            // Supprimer le fichier physique
+
             Path filePath = Paths.get(UPLOAD_DIR, document.getFilePath());
             Files.deleteIfExists(filePath);
 
-            // Supprimer de la base de données
             application.removeDocument(document);
             documentRepository.delete(document);
             applicationRepository.save(application);
@@ -294,6 +319,48 @@ public class ApplicationServiceImpl implements ApplicationService {
         } catch (IOException e) {
             throw new UserServiceException("Erreur lors de la suppression du document",
                     HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public ApplicationDTO updateApplication(UUID id, ApplicationWithDocumentsDTO updateDTO) {
+        // Récupérer l'application existante
+        Application application = applicationRepository.findById(id)
+                .orElseThrow(() -> new UserServiceException("Candidature non trouvée", HttpStatus.NOT_FOUND));
+
+        // Vérifier si l'annonce est toujours ouverte
+        JobAnnouncement announcement = application.getAnnouncement();
+        if (!announcement.isOpen()) {
+            throw new UserServiceException("La période de candidature est terminée", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // Mettre à jour les informations de base
+            application.setApplicationType(updateDTO.getApplicationType());
+
+            // Gérer les documents
+            if (updateDTO.getDocuments() != null && !updateDTO.getDocuments().isEmpty()) {
+                // Supprimer les anciens documents si nécessaire
+                for (Document oldDoc : new ArrayList<>(application.getDocuments())) {
+                    removeDocumentFromApplication(application.getId(), oldDoc.getId());
+                }
+
+                // Ajouter les nouveaux documents
+                for (DocumentDTO documentDTO : updateDTO.getDocuments()) {
+                    addDocumentToApplication(application.getId(),
+                            documentDTO.getBase64Content(),
+                            documentDTO.getOriginalFilename(),
+                            documentDTO.getDocumentType());
+                }
+            }
+
+            // Sauvegarder les modifications
+            Application updatedApplication = applicationRepository.save(application);
+            return modelMapper.map(updatedApplication, ApplicationDTO.class);
+
+        } catch (Exception e) {
+            throw new UserServiceException("Erreur lors de la mise à jour de la candidature: " +
+                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

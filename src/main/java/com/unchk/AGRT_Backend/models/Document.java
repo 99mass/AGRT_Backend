@@ -1,20 +1,21 @@
 package com.unchk.AGRT_Backend.models;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.unchk.AGRT_Backend.enums.DocumentStatus;
 import com.unchk.AGRT_Backend.enums.DocumentType;
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.*;
-
 @Entity
 @Table(name = "documents")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Document {
@@ -24,7 +25,7 @@ public class Document {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_id", nullable = false)
-    @JsonIgnore
+    @JsonBackReference
     private Application application;
 
     @Enumerated(EnumType.STRING)
@@ -32,10 +33,10 @@ public class Document {
     private DocumentType documentType;
 
     @Column(name = "file_name", nullable = false)
-    private String fileName; // Nom original du fichier
+    private String fileName;
 
     @Column(name = "file_path", nullable = false)
-    private String filePath; // Chemin généré pour le stockage
+    private String filePath;
 
     @Column(name = "file_size", nullable = false)
     private Integer fileSize;
@@ -46,6 +47,12 @@ public class Document {
     @Column(name = "upload_date", nullable = false)
     private LocalDateTime uploadDate;
 
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DocumentStatus status;
@@ -54,14 +61,25 @@ public class Document {
 
     @PrePersist
     protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
         if (uploadDate == null) {
-            uploadDate = LocalDateTime.now();
+            uploadDate = now;
+        }
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
         }
         if (status == null) {
             status = DocumentStatus.VALID;
         }
     }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     public void generateFilePath() {
         if (application == null || application.getId() == null) {
@@ -72,9 +90,7 @@ public class Document {
         String applicantId = application.getCandidate().getId().toString();
         String extension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
 
-        // Assurez-vous que l'ID du document est généré avant
         if (this.getId() == null) {
-            // Générer un UUID temporaire si nécessaire
             this.setId(UUID.randomUUID());
         }
 

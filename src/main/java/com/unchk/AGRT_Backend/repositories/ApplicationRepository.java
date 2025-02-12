@@ -1,6 +1,7 @@
 package com.unchk.AGRT_Backend.repositories;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,9 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID> 
     List<Application> findByAnnouncementId(UUID announcementId);
 
     List<Application> findByAcademicYearId(UUID academicYearId);
+
+    @Query("SELECT a FROM Application a LEFT JOIN FETCH a.documents WHERE a.id = :id")
+    Optional<Application> findByIdWithDocuments(@Param("id") UUID id);
 
     boolean existsByCandidateIdAndAnnouncementId(UUID candidateId, UUID announcementId);
 

@@ -6,4 +6,5 @@ public interface FileStorageService {
     String storeFile(String base64Image, String filename) throws IOException;
     void deleteFile(String filename);
     Path getFilePath(String filename);
+    public Path getFilePathDocument(String filename);
 }

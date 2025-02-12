@@ -1,25 +1,28 @@
 package com.unchk.AGRT_Backend.controllers;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 
 import com.unchk.AGRT_Backend.services.ApplicationService;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
+import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
-// import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 // import java.util.List;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -54,131 +57,78 @@ public class ApplicationController {
         }
     }
 
-    @Operation(summary = "Obtenir une candidature par son ID", description = "Récupère les détails d'une candidature spécifique", responses = {
-            @ApiResponse(responseCode = "200", description = "Candidature trouvée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApplicationDTO.class))),
-            @ApiResponse(responseCode = "404", description = "Candidature non trouvée", content = @Content)
-    })
-    @GetMapping("/{id}")
-    public ResponseEntity<ApplicationDTO> getApplication(
-            @Parameter(description = "ID de la candidature", required = true) @PathVariable UUID id) {
+    @GetMapping("/announcement/{announcementId}")
+    @Operation(summary = "Récupérer toutes les candidatures pour une annonce spécifique")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<ApplicationDetailDTO>> getApplicationsByAnnouncement(
+            @PathVariable UUID announcementId) {
         try {
-            ApplicationDTO application = applicationService.getApplicationById(id);
-            return ResponseEntity.ok(application);
+            List<ApplicationDetailDTO> applications = applicationService
+                    .getApplicationsByAnnouncementWithDocuments(announcementId);
+            return ResponseEntity.ok(applications);
         } catch (UserServiceException e) {
-            return ResponseEntity.notFound().build();
+            throw new ResponseStatusException(e.getStatus(), e.getMessage());
         }
     }
 
-    // @Operation(summary = "Mettre à jour le statut d'une candidature", description
-    // = "Permet de modifier le statut d'une candidature existante", responses = {
-    // @ApiResponse(responseCode = "200", description = "Statut mis à jour avec
-    // succès", content = @Content(mediaType = "application/json", schema =
-    // @Schema(implementation = ApplicationDTO.class))),
-    // @ApiResponse(responseCode = "404", description = "Candidature non trouvée",
-    // content = @Content)
-    // })
-    // @PutMapping("/{id}/status")
-    // public ResponseEntity<ApplicationDTO> updateApplicationStatus(
-    // @Parameter(description = "ID de la candidature", required = true)
-    // @PathVariable UUID id,
+    @GetMapping("/{id}")
+    @Operation(summary = "Récupérer une candidature par son ID avec tous ses documents")
+    @ApiResponse(responseCode = "200", description = "Candidature trouvée avec ses documents")
+    @ApiResponse(responseCode = "404", description = "Candidature non trouvée")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ResponseEntity<ApplicationDetailDTO> getApplicationById(@PathVariable UUID id) {
+        try {
+            ApplicationDetailDTO application = applicationService.getApplicationByIdWithDocuments(id);
+            return ResponseEntity.ok(application);
+        } catch (UserServiceException e) {
+            throw new ResponseStatusException(e.getStatus(), e.getMessage());
+        }
+    }
+    @PutMapping("/{id}")
+    @Operation(summary = "Mettre à jour une candidature", description = "Permet de modifier une candidature existante si la date de fin n'est pas atteinte")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Candidature mise à jour avec succès", content = @Content(schema = @Schema(implementation = ApplicationDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requête invalide ou période de candidature terminée"),
+            @ApiResponse(responseCode = "403", description = "Accès non autorisé"),
+            @ApiResponse(responseCode = "404", description = "Candidature non trouvée"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la mise à jour")
+    })
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<?> updateApplication(
+            @PathVariable UUID id,
+            @RequestBody ApplicationWithDocumentsDTO updateDTO) {
+        try {
+            ApplicationDTO updatedApplication = applicationService.updateApplication(id, updateDTO);
+            return ResponseEntity.ok(updatedApplication);
+        } catch (UserServiceException e) {
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Une erreur inattendue s'est produite"));
+        }
+    }
 
-    // @Parameter(description = "Nouveau statut", required = true) @RequestParam
-    // ApplicationStatus status,
+    @DeleteMapping("/{applicationId}/documents/{documentId}")
+    @Operation(summary = "Supprimer un document d'une candidature")
+    @ApiResponse(responseCode = "204", description = "Document supprimé avec succès")
+    @ApiResponse(responseCode = "404", description = "Document ou candidature non trouvé")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ResponseEntity<Void> deleteDocument(
+            @PathVariable UUID applicationId,
+            @PathVariable UUID documentId) {
+        applicationService.removeDocumentFromApplication(applicationId, documentId);
+        return ResponseEntity.noContent().build();
+    }
 
-    // @Parameter(description = "Commentaires sur le changement de statut")
-    // @RequestParam(required = false) String comments) {
-    // try {
-    // ApplicationDTO updatedApplication =
-    // applicationService.updateApplicationStatus(id, status, comments);
-    // return ResponseEntity.ok(updatedApplication);
-    // } catch (UserServiceException e) {
-    // return ResponseEntity.status(e.getStatus()).build();
-    // }
-    // }
+    @GetMapping("/{id}/complete")
+    @Operation(summary = "Vérifier si une candidature est complète")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ResponseEntity<Boolean> isApplicationComplete(@PathVariable UUID id) {
+        boolean isComplete = applicationService.isApplicationComplete(id);
+        return ResponseEntity.ok(isComplete);
+    }
 
-    // @Operation(summary = "Obtenir toutes les candidatures", description =
-    // "Récupère la liste de toutes les candidatures", responses = {
-    // @ApiResponse(responseCode = "200", description = "Liste des candidatures
-    // récupérée avec succès", content = @Content(mediaType = "application/json",
-    // schema = @Schema(implementation = ApplicationDTO.class)))
-    // })
-    // @GetMapping
-    // public ResponseEntity<List<ApplicationDTO>> getAllApplications() {
-    // return ResponseEntity.ok(applicationService.getAllApplications());
-    // }
-
-    // @Operation(summary = "Obtenir les candidatures par candidat", description =
-    // "Récupère toutes les candidatures d'un candidat spécifique", responses = {
-    // @ApiResponse(responseCode = "200", description = "Liste des candidatures du
-    // candidat récupérée avec succès", content = @Content(mediaType =
-    // "application/json", schema = @Schema(implementation = ApplicationDTO.class)))
-    // })
-    // @GetMapping("/candidate/{candidateId}")
-    // public ResponseEntity<List<ApplicationDTO>> getApplicationsByCandidate(
-    // @Parameter(description = "ID du candidat", required = true) @PathVariable
-    // UUID candidateId) {
-    // return
-    // ResponseEntity.ok(applicationService.getApplicationsByCandidate(candidateId));
-    // }
-
-    // @Operation(summary = "Obtenir les candidatures par annonce", description =
-    // "Récupère toutes les candidatures pour une annonce spécifique", responses = {
-    // @ApiResponse(responseCode = "200", description = "Liste des candidatures pour
-    // l'annonce récupérée avec succès", content = @Content(mediaType =
-    // "application/json", schema = @Schema(implementation = ApplicationDTO.class)))
-    // })
-    // @GetMapping("/announcement/{announcementId}")
-    // public ResponseEntity<List<ApplicationDTO>> getApplicationsByAnnouncement(
-    // @Parameter(description = "ID de l'annonce", required = true) @PathVariable
-    // UUID announcementId) {
-    // return
-    // ResponseEntity.ok(applicationService.getApplicationsByAnnouncement(announcementId));
-    // }
-
-    // @Operation(summary = "Vérifier si une candidature est complète", description
-    // = "Vérifie si tous les documents requis sont présents et valides", responses
-    // = {
-    // @ApiResponse(responseCode = "200", description = "Statut de complétude
-    // vérifié avec succès"),
-    // @ApiResponse(responseCode = "404", description = "Candidature non trouvée",
-    // content = @Content)
-    // })
-    // @GetMapping("/{id}/complete")
-    // public ResponseEntity<Boolean> isApplicationComplete(
-    // @Parameter(description = "ID de la candidature", required = true)
-    // @PathVariable UUID id) {
-    // try {
-    // boolean isComplete = applicationService.isApplicationComplete(id);
-    // return ResponseEntity.ok(isComplete);
-    // } catch (UserServiceException e) {
-    // return ResponseEntity.notFound().build();
-    // }
-    // }
-
-    // @Operation(summary = "Rechercher des candidatures", description = "Recherche
-    // des candidatures selon différents critères", responses = {
-    // @ApiResponse(responseCode = "200", description = "Résultats de la recherche",
-    // content = @Content(mediaType = "application/json", schema =
-    // @Schema(implementation = ApplicationDTO.class)))
-    // })
-    // @GetMapping("/search")
-    // public ResponseEntity<List<ApplicationDTO>> searchApplications(
-    // @Parameter(description = "Terme de recherche") @RequestParam String query) {
-    // return ResponseEntity.ok(applicationService.searchApplications(query));
-    // }
-
-    // @Operation(summary = "Obtenir les candidatures par année académique",
-    // description = "Récupère toutes les candidatures pour une année académique
-    // spécifique", responses = {
-    // @ApiResponse(responseCode = "200", description = "Liste des candidatures pour
-    // l'année académique récupérée avec succès", content = @Content(mediaType =
-    // "application/json", schema = @Schema(implementation = ApplicationDTO.class)))
-    // })
-    // @GetMapping("/academic-year/{academicYearId}")
-    // public ResponseEntity<List<ApplicationDTO>> getApplicationsByAcademicYear(
-    // @Parameter(description = "ID de l'année académique", required = true)
-    // @PathVariable UUID academicYearId) {
-    // return
-    // ResponseEntity.ok(applicationService.getApplicationsByAcademicYear(academicYearId));
-    // }
 }

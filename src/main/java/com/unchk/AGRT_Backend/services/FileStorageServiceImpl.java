@@ -48,6 +48,10 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public Path getFilePath(String filename) {
-        return Paths.get(uploadDir).resolve(filename);
+        return Paths.get(uploadDir+"/images").resolve(filename);
+    }
+    @Override
+    public Path getFilePathDocument(String filename) {
+        return Paths.get(uploadDir+"/documents").resolve(filename);
     }
 }
