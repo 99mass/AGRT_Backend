@@ -19,7 +19,7 @@ public interface ApplicationService {
 
     public List<ApplicationDetailDTO> getApplicationsByAnnouncementWithDocuments(UUID announcementId);
 
-    ApplicationDTO updateApplication(UUID id, ApplicationWithDocumentsDTO updateDTO);
+    ApplicationDetailDTO updateApplication(UUID id, ApplicationWithDocumentsDTO updateDTO);
 
     ApplicationDTO updateApplicationStatus(UUID id, ApplicationStatus newStatus, String comments);
 

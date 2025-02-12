@@ -84,7 +84,7 @@ public class ApplicationController {
             throw new ResponseStatusException(e.getStatus(), e.getMessage());
         }
     }
-    @PutMapping("/{id}")
+
     @Operation(summary = "Mettre à jour une candidature", description = "Permet de modifier une candidature existante si la date de fin n'est pas atteinte")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Candidature mise à jour avec succès", content = @Content(schema = @Schema(implementation = ApplicationDTO.class))),
@@ -94,11 +94,12 @@ public class ApplicationController {
             @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la mise à jour")
     })
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PutMapping("/{id}")
     public ResponseEntity<?> updateApplication(
             @PathVariable UUID id,
             @RequestBody ApplicationWithDocumentsDTO updateDTO) {
         try {
-            ApplicationDTO updatedApplication = applicationService.updateApplication(id, updateDTO);
+            ApplicationDetailDTO updatedApplication = applicationService.updateApplication(id, updateDTO);
             return ResponseEntity.ok(updatedApplication);
         } catch (UserServiceException e) {
             return ResponseEntity
@@ -110,6 +111,23 @@ public class ApplicationController {
                     .body(Map.of("message", "Une erreur inattendue s'est produite"));
         }
     }
+    // public ResponseEntity<?> updateApplication(
+    // @PathVariable UUID id,
+    // @RequestBody ApplicationWithDocumentsDTO updateDTO) {
+    // try {
+    // ApplicationDTO updatedApplication = applicationService.updateApplication(id,
+    // updateDTO);
+    // return ResponseEntity.ok(updatedApplication);
+    // } catch (UserServiceException e) {
+    // return ResponseEntity
+    // .status(e.getStatus())
+    // .body(Map.of("message", e.getMessage()));
+    // } catch (Exception e) {
+    // return ResponseEntity
+    // .status(HttpStatus.INTERNAL_SERVER_ERROR)
+    // .body(Map.of("message", "Une erreur inattendue s'est produite"));
+    // }
+    // }
 
     @DeleteMapping("/{applicationId}/documents/{documentId}")
     @Operation(summary = "Supprimer un document d'une candidature")
