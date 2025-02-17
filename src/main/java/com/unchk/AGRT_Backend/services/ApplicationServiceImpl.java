@@ -171,8 +171,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         application.updateStatus(newStatus, currentUser, comments);
         Application updatedApplication = applicationRepository.save(application);
 
-        // Envoyer une notification
-        // notificationService.sendStatusUpdateNotification(updatedApplication);
+        // TODO: Envoyer une notification
 
         return modelMapper.map(updatedApplication, ApplicationDTO.class);
     }
@@ -321,62 +320,6 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
     }
 
-    // @Transactional
-    // public ApplicationDTO updateApplication(UUID id, ApplicationWithDocumentsDTO
-    // updateDTO) {
-    // // Récupérer l'application existante
-    // Application application = applicationRepository.findById(id)
-    // .orElseThrow(() -> new UserServiceException("Candidature non trouvée",
-    // HttpStatus.NOT_FOUND));
-
-    // // Vérifier si l'annonce est toujours ouverte
-    // JobAnnouncement announcement = application.getAnnouncement();
-    // if (!announcement.isOpen()) {
-    // throw new UserServiceException("La période de candidature est terminée",
-    // HttpStatus.BAD_REQUEST);
-    // }
-
-    // try {
-    // // Mettre à jour les informations de base
-    // application.setApplicationType(updateDTO.getApplicationType());
-
-    // // Gérer les documents
-    // if (updateDTO.getDocuments() != null && !updateDTO.getDocuments().isEmpty())
-    // {
-    // for (DocumentDTO documentDTO : updateDTO.getDocuments()) {
-    // // Ne traiter que les documents avec un contenu non vide
-    // if (documentDTO.getBase64Content() != null &&
-    // !documentDTO.getBase64Content().trim().isEmpty()) {
-    // // Rechercher un document existant du même type
-    // Document existingDoc = application.getDocuments().stream()
-    // .filter(doc -> doc.getDocumentType() == documentDTO.getDocumentType())
-    // .findFirst()
-    // .orElse(null);
-
-    // // Si un document du même type existe, le supprimer
-    // if (existingDoc != null) {
-    // removeDocumentFromApplication(application.getId(), existingDoc.getId());
-    // }
-
-    // // Ajouter le nouveau document
-    // addDocumentToApplication(application.getId(),
-    // documentDTO.getBase64Content(),
-    // documentDTO.getOriginalFilename(),
-    // documentDTO.getDocumentType());
-    // }
-    // }
-    // }
-
-    // // Sauvegarder les modifications
-    // Application updatedApplication = applicationRepository.save(application);
-    // return modelMapper.map(updatedApplication, ApplicationDTO.class);
-
-    // } catch (Exception e) {
-    // throw new UserServiceException("Erreur lors de la mise à jour de la
-    // candidature: " +
-    // e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-    // }
-    // }
     @Transactional
     public ApplicationDetailDTO updateApplication(UUID id, ApplicationWithDocumentsDTO updateDTO) {
         // Récupérer l'application existante

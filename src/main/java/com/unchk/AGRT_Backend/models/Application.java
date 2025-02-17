@@ -9,7 +9,9 @@ import com.unchk.AGRT_Backend.enums.DocumentType;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -76,14 +78,19 @@ public class Application {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "application",  fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "application", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("application-documents")
     private Set<Document> documents = new HashSet<>();
 
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Notification> notifications = new HashSet<>();
 
+    // @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval
+    // = true)
+    // private Set<ApplicationHistory> history = new HashSet<>();
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Set<ApplicationHistory> history = new HashSet<>();
 
     @PrePersist

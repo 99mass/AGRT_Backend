@@ -11,10 +11,13 @@ import com.unchk.AGRT_Backend.services.ApplicationService;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
+import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -85,6 +88,91 @@ public class ApplicationController {
         }
     }
 
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Mettre à jour le statut d'une candidature", description = "Permet à un administrateur de modifier le statut d'une candidature et d'ajouter des commentaires")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Statut mis à jour avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApplicationDetailDTO.class), examples = @ExampleObject(value = """
+                    {
+                        "id": "44dca219-a7fd-41a8-b16e-839c2ddcd384",
+                        "candidateId": "550e8400-e29b-41d4-a716-446655440000",
+                        "announcementId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                        "academicYearId": "91c27c34-e775-4c4e-806c-721c34a7bfb9",
+                        "status": "UNDER_REVIEW",
+                        "applicationType": "FULL_TIME",
+                        "createdAt": "2024-02-17T10:30:00",
+                        "updatedAt": "2024-02-17T14:45:00",
+                        "documents": [
+                            {
+                                "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                                "fileName": "CV_2024.pdf",
+                                "filePath": "/api/documents/CV_2024.pdf",
+                                "documentType": "CV",
+                                "status": "VALID",
+                                "uploadDate": "2024-02-17T10:35:00"
+                            }
+                        ]
+                    }
+                    """))),
+            @ApiResponse(responseCode = "400", description = "Données invalides", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                    {
+                        "message": "Statut invalide"
+                    }
+                    """))),
+            @ApiResponse(responseCode = "403", description = "Accès non autorisé", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                    {
+                        "message": "Accès refusé"
+                    }
+                    """))),
+            @ApiResponse(responseCode = "404", description = "Candidature non trouvée", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                    {
+                        "message": "Candidature non trouvée"
+                    }
+                    """)))
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = StatusUpdateRequest.class), examples = @ExampleObject(value = """
+            {
+                "status": "UNDER_REVIEW",
+                "comments": "La candidature a été mise en cours de révision"
+            }
+            """)))
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateApplicationStatus(
+            @Parameter(description = "ID de la candidature", required = true) @PathVariable UUID id,
+            @RequestBody Map<String, Object> updateRequest) {
+        try {
+            ApplicationStatus newStatus = ApplicationStatus.valueOf((String) updateRequest.get("status"));
+            String comments = (String) updateRequest.getOrDefault("comments", "");
+
+            @SuppressWarnings("unused")
+            ApplicationDTO updatedApplication = applicationService.updateApplicationStatus(id, newStatus, comments);
+            ApplicationDetailDTO applicationDetail = applicationService.getApplicationByIdWithDocuments(id);
+
+            return ResponseEntity.ok(applicationDetail);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Statut invalide"));
+        } catch (UserServiceException e) {
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Une erreur inattendue s'est produite"));
+        }
+    }
+
+    // Classe pour la documentation Swagger
+    @Schema(description = "Requête de mise à jour du statut")
+    class StatusUpdateRequest {
+        @Schema(description = "Nouveau statut de la candidature", example = "UNDER_REVIEW", required = true)
+        private String status;
+
+        @Schema(description = "Commentaires sur le changement de statut", example = "La candidature a été mise en cours de révision")
+        private String comments;
+    }
+
     @Operation(summary = "Mettre à jour une candidature", description = "Permet de modifier une candidature existante si la date de fin n'est pas atteinte")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Candidature mise à jour avec succès", content = @Content(schema = @Schema(implementation = ApplicationDTO.class))),
@@ -111,23 +199,6 @@ public class ApplicationController {
                     .body(Map.of("message", "Une erreur inattendue s'est produite"));
         }
     }
-    // public ResponseEntity<?> updateApplication(
-    // @PathVariable UUID id,
-    // @RequestBody ApplicationWithDocumentsDTO updateDTO) {
-    // try {
-    // ApplicationDTO updatedApplication = applicationService.updateApplication(id,
-    // updateDTO);
-    // return ResponseEntity.ok(updatedApplication);
-    // } catch (UserServiceException e) {
-    // return ResponseEntity
-    // .status(e.getStatus())
-    // .body(Map.of("message", e.getMessage()));
-    // } catch (Exception e) {
-    // return ResponseEntity
-    // .status(HttpStatus.INTERNAL_SERVER_ERROR)
-    // .body(Map.of("message", "Une erreur inattendue s'est produite"));
-    // }
-    // }
 
     @DeleteMapping("/{applicationId}/documents/{documentId}")
     @Operation(summary = "Supprimer un document d'une candidature")
