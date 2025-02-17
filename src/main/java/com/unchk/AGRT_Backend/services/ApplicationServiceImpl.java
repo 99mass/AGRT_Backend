@@ -37,16 +37,16 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ApplicationServiceImpl implements ApplicationService {
 
+    private static final String UPLOAD_DIR = "uploads/documents";
+
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final JobAnnouncementRepository announcementRepository;
     private final AcademicYearRepository academicYearRepository;
     private final DocumentRepository documentRepository;
     private final ModelMapper modelMapper;
-    // private final NotificationService notificationService;
+    private final EmailService emailService;
     private final JwtProperties jwtProperties;
-
-    private static final String UPLOAD_DIR = "uploads/documents";
 
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -131,6 +131,13 @@ public class ApplicationServiceImpl implements ApplicationService {
         Application savedApplication;
         try {
             savedApplication = applicationRepository.save(application);
+
+            // Envoi de l'email de confirmation
+            emailService.sendApplicationConfirmationEmail(
+                    candidate.getEmail(),
+                    candidate.getFirstName() + " " + candidate.getLastName(),
+                    announcement.getTitle());
+
         } catch (Exception e) {
             throw new UserServiceException("Erreur lors de la sauvegarde de la candidature",
                     HttpStatus.INTERNAL_SERVER_ERROR);
@@ -171,7 +178,13 @@ public class ApplicationServiceImpl implements ApplicationService {
         application.updateStatus(newStatus, currentUser, comments);
         Application updatedApplication = applicationRepository.save(application);
 
-        // TODO: Envoyer une notification
+        // Envoyer l'email de mise à jour
+        emailService.sendStatusUpdateEmail(
+                application.getCandidate().getEmail(),
+                application.getCandidate().getFirstName() + " " + application.getCandidate().getLastName(),
+                application.getAnnouncement().getTitle(),
+                newStatus,
+                comments);
 
         return modelMapper.map(updatedApplication, ApplicationDTO.class);
     }

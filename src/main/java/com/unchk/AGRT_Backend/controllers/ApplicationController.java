@@ -163,7 +163,6 @@ public class ApplicationController {
         }
     }
 
-    // Classe pour la documentation Swagger
     @Schema(description = "Requête de mise à jour du statut")
     class StatusUpdateRequest {
         @Schema(description = "Nouveau statut de la candidature", example = "UNDER_REVIEW", required = true)

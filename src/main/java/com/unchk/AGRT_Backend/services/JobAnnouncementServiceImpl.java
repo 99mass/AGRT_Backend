@@ -65,12 +65,41 @@ public class JobAnnouncementServiceImpl implements JobAnnouncementService {
         }
     }
 
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UserServiceException("Authentication requise", HttpStatus.UNAUTHORIZED);
+        }
+
+        String token = null;
+        if (authentication.getCredentials() instanceof String) {
+            token = (String) authentication.getCredentials();
+        }
+
+        if (token == null) {
+            throw new UserServiceException("Token d'authentification invalide", HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(jwtProperties.getSecretKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            String email = claims.get("email", String.class);
+            return userRepository.findByEmail(email)
+                    .orElseThrow(() -> new UserServiceException("Utilisateur non trouvé", HttpStatus.NOT_FOUND));
+        } catch (Exception e) {
+            throw new UserServiceException("Erreur lors du traitement du token", HttpStatus.UNAUTHORIZED);
+        }
+    }
+
     @Override
     public JobAnnouncementDTO createAnnouncement(JobAnnouncementDTO announcementDTO) {
         verifyAdminAccess();
 
-        // Vérifier si une annonce avec le même titre existe déjà pour cette année
-        // académique
+        // Vérifier si une annonce avec le même titre existe déjà
         if (announcementRepository.existsByTitleAndAcademicYear_Id(
                 announcementDTO.getTitle(),
                 announcementDTO.getAcademicYearId())) {
@@ -83,13 +112,13 @@ public class JobAnnouncementServiceImpl implements JobAnnouncementService {
         AcademicYear academicYear = academicYearRepository.findById(announcementDTO.getAcademicYearId())
                 .orElseThrow(() -> new UserServiceException("Academic year not found", HttpStatus.NOT_FOUND));
 
-        // Validate created by user
-        User createdBy = userRepository.findById(announcementDTO.getCreatedById())
-                .orElseThrow(() -> new UserServiceException("User not found", HttpStatus.NOT_FOUND));
+        // Récupérer l'utilisateur courant à partir du JWT
+        User currentUser = getCurrentUser();
+
         try {
             JobAnnouncement announcement = modelMapper.map(announcementDTO, JobAnnouncement.class);
             announcement.setAcademicYear(academicYear);
-            announcement.setCreatedBy(createdBy);
+            announcement.setCreatedBy(currentUser); // Utiliser l'utilisateur courant
             announcement.setStatus(AnnouncementStatus.DRAFT);
 
             JobAnnouncement savedAnnouncement = announcementRepository.save(announcement);
