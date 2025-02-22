@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Data
 public class ApplicationWithDocumentsDTO {
-    private UUID candidateId;
+    // private UUID candidateId;
     private UUID announcementId;
     private UUID academicYearId;
     private ApplicationType applicationType;
