@@ -246,7 +246,6 @@ public class UserService {
         String profilePicturePath = user.getProfilePicture();
         if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
             try {
-
                 // Validation de l'image avant le stockage
                 ProfilePictureValidator.validateProfilePicture(request.getProfilePicture());
 
@@ -269,7 +268,6 @@ public class UserService {
                         HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
-
         // Save and return updated user
         User savedUser = userRepository.save(user);
         return new UserDTO().toDTO(savedUser);

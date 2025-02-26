@@ -11,21 +11,27 @@ import java.util.UUID;
 
 @Service
 public class FileStorageServiceImpl implements FileStorageService {
-    
+
     @Value("${file.upload-dir}")
     private String uploadDir;
 
     @Override
     public String storeFile(String base64Image, String originalFilename) throws IOException {
-        // Créer le répertoire s'il n'existe pas
+        // Créer le répertoire principal s'il n'existe pas
         Path uploadPath = Paths.get(uploadDir);
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
 
+        // Créer le sous-répertoire pour les images s'il n'existe pas
+        Path imagesPath = Paths.get(uploadDir + "/images");
+        if (!Files.exists(imagesPath)) {
+            Files.createDirectories(imagesPath);
+        }
+
         // Générer un nom de fichier unique
         String filename = UUID.randomUUID().toString() + "_" + originalFilename;
-        Path filePath = uploadPath.resolve(filename);
+        Path filePath = imagesPath.resolve(filename);
 
         // Décoder et sauvegarder l'image
         String[] parts = base64Image.split(",");
@@ -48,10 +54,11 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public Path getFilePath(String filename) {
-        return Paths.get(uploadDir+"/images").resolve(filename);
+        return Paths.get(uploadDir + "/images").resolve(filename);
     }
+
     @Override
     public Path getFilePathDocument(String filename) {
-        return Paths.get(uploadDir+"/documents").resolve(filename);
+        return Paths.get(uploadDir + "/documents").resolve(filename);
     }
 }

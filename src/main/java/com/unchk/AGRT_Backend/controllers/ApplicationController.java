@@ -78,7 +78,7 @@ public class ApplicationController {
     @Operation(summary = "Récupérer une candidature par son ID avec tous ses documents")
     @ApiResponse(responseCode = "200", description = "Candidature trouvée avec ses documents")
     @ApiResponse(responseCode = "404", description = "Candidature non trouvée")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CANDIDATE')")
     public ResponseEntity<ApplicationDetailDTO> getApplicationById(@PathVariable UUID id) {
         try {
             ApplicationDetailDTO application = applicationService.getApplicationByIdWithDocuments(id);
@@ -180,7 +180,7 @@ public class ApplicationController {
             @ApiResponse(responseCode = "404", description = "Candidature non trouvée"),
             @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la mise à jour")
     })
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CANDIDATE', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateApplication(
             @PathVariable UUID id,
@@ -203,7 +203,7 @@ public class ApplicationController {
     @Operation(summary = "Supprimer un document d'une candidature")
     @ApiResponse(responseCode = "204", description = "Document supprimé avec succès")
     @ApiResponse(responseCode = "404", description = "Document ou candidature non trouvé")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CANDIDATE')")
     public ResponseEntity<Void> deleteDocument(
             @PathVariable UUID applicationId,
             @PathVariable UUID documentId) {
@@ -213,10 +213,51 @@ public class ApplicationController {
 
     @GetMapping("/{id}/complete")
     @Operation(summary = "Vérifier si une candidature est complète")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CANDIDATE')")
     public ResponseEntity<Boolean> isApplicationComplete(@PathVariable UUID id) {
         boolean isComplete = applicationService.isApplicationComplete(id);
         return ResponseEntity.ok(isComplete);
     }
 
+    @GetMapping("/user")
+    @Operation(summary = "Récupérer toutes les candidatures de l'utilisateur actuel", description = "Renvoie toutes les candidatures de l'utilisateur connecté avec leurs documents")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Liste des candidatures récupérée avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApplicationDetailDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Non authentifié"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur")
+    })
+    @PreAuthorize("hasRole('CANDIDATE')")
+    public ResponseEntity<List<ApplicationDetailDTO>> getUserApplications() {
+        try {
+            List<ApplicationDetailDTO> applications = applicationService.getApplicationsByCurrentUser();
+            return ResponseEntity.ok(applications);
+        } catch (UserServiceException e) {
+            throw new ResponseStatusException(e.getStatus(), e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}/cancel")
+    @Operation(summary = "Annuler une candidature", description = "Permet à un candidat d'annuler sa candidature en supprimant tous les documents associés et la candidature elle-même")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Candidature annulée avec succès"),
+            @ApiResponse(responseCode = "400", description = "La candidature ne peut plus être annulée"),
+            @ApiResponse(responseCode = "403", description = "Accès non autorisé"),
+            @ApiResponse(responseCode = "404", description = "Candidature non trouvée"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de l'annulation")
+    })
+    @PreAuthorize("hasAnyRole('CANDIDATE', 'ADMIN')")
+    public ResponseEntity<?> cancelApplication(@PathVariable UUID id) {
+        try {
+            applicationService.cancelApplication(id);
+            return ResponseEntity.noContent().build();
+        } catch (UserServiceException e) {
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Une erreur inattendue s'est produite"));
+        }
+    }
 }

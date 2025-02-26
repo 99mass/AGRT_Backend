@@ -18,42 +18,44 @@ import java.util.Map;
 @Service
 public class AuthenticationService {
 
-    private final JwtProperties jwtProperties;
-    private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
+        private final JwtProperties jwtProperties;
+        private final AuthenticationManager authenticationManager;
+        private final UserRepository userRepository;
 
-    @Autowired
-    public AuthenticationService(
-            JwtProperties jwtProperties,
-            AuthenticationManager authenticationManager,
-            UserRepository userRepository) {
-        this.jwtProperties = jwtProperties;
-        this.authenticationManager = authenticationManager;
-        this.userRepository = userRepository;
-    }
+        @Autowired
+        public AuthenticationService(
+                        JwtProperties jwtProperties,
+                        AuthenticationManager authenticationManager,
+                        UserRepository userRepository) {
+                this.jwtProperties = jwtProperties;
+                this.authenticationManager = authenticationManager;
+                this.userRepository = userRepository;
+        }
 
-    public Map<String, String> authenticate(String email, String password) {
-        @SuppressWarnings("unused")
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, password));
+        public Map<String, String> authenticate(String email, String password) {
+                @SuppressWarnings("unused")
+                Authentication authentication = authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(email, password));
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String token = Jwts.builder()
-                .setSubject(user.getEmail())
-                .claim("email", user.getEmail())
-                .claim("role", user.getRole().toString())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtProperties.getExpirationTime()))
-                .signWith(jwtProperties.getSecretKey())
-                .compact();
+                String token = Jwts.builder()
+                                .setSubject(user.getEmail())
+                                .claim("email", user.getEmail())
+                                .claim("role", user.getRole().toString())
+                                .setIssuedAt(new Date())
+                                .setExpiration(new Date(System.currentTimeMillis() + jwtProperties.getExpirationTime()))
+                                .signWith(jwtProperties.getSecretKey())
+                                .compact();
 
-        Map<String, String> response = new HashMap<>();
-        response.put("token", token);
-        response.put("role", user.getRole().toString());
-        response.put("email", user.getEmail());
+                Map<String, String> response = new HashMap<>();
+                response.put("token", token);
+                response.put("role", user.getRole().toString());
+                response.put("email", user.getEmail());
+                response.put("id", user.getId().toString());
+                response.put("picture", user.getProfilePicture());
 
-        return response;
-    }
+                return response;
+        }
 }

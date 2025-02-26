@@ -24,6 +24,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -93,6 +94,25 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw new UserServiceException("Annonce non trouvée", HttpStatus.NOT_FOUND);
         }
 
+        try {
+            // Vérifier si l'annonce est ouverte
+            if (!announcement.isOpen()) {
+                throw new UserServiceException("Cette annonce n'est plus ouverte aux candidatures",
+                        HttpStatus.BAD_REQUEST);
+            }
+        } catch (Exception e) {
+            throw new UserServiceException("Cette annonce n'est plus ouverte aux candidatures", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // Vérifier si le candidat peut postuler
+            if (!canCandidateApply(candidate.getId(), announcement.getId())) {
+                throw new UserServiceException("Vous avez déjà postulé à cette annonce", HttpStatus.CONFLICT);
+            }
+        } catch (Exception e) {
+            throw new UserServiceException("Vous avez déjà postulé à cette annonce", HttpStatus.CONFLICT);
+        }
+
         // Vérifier si l'année académique existe
         try {
             @SuppressWarnings("unused")
@@ -100,16 +120,6 @@ public class ApplicationServiceImpl implements ApplicationService {
                     .orElseThrow(() -> new UserServiceException("Année académique non trouvée", HttpStatus.NOT_FOUND));
         } catch (Exception e) {
             throw new UserServiceException("Année académique non trouvée", HttpStatus.NOT_FOUND);
-        }
-
-        // Vérifier si l'annonce est ouverte
-        if (!announcement.isOpen()) {
-            throw new UserServiceException("Cette annonce n'est plus ouverte aux candidatures", HttpStatus.BAD_REQUEST);
-        }
-
-        // Vérifier si le candidat peut postuler
-        if (!canCandidateApply(candidate.getId(), announcement.getId())) {
-            throw new UserServiceException("Vous avez déjà postulé à cette annonce", HttpStatus.BAD_REQUEST);
         }
 
         // Créer la candidature
@@ -184,6 +194,17 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ApplicationDetailDTO> getApplicationsByCurrentUser() {
+        User currentUser = getCurrentUser();
+        List<Application> applications = applicationRepository.findByCandidateId(currentUser.getId());
+
+        return applications.stream()
+                .map(this::convertToApplicationDetailDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ApplicationDetailDTO getApplicationByIdWithDocuments(UUID id) {
 
         Application application = applicationRepository.findByIdWithDocuments(id)
@@ -235,7 +256,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .map(doc -> {
                     DocumentResponseDTO docDTO = modelMapper.map(doc, DocumentResponseDTO.class);
                     // Ne pas inclure le chemin complet du fichier pour des raisons de sécurité
-                    docDTO.setFilePath("/api/documents/" + doc.getFilePath());
+                    docDTO.setFilePath("/api/files/documents/" + doc.getFilePath());
                     return docDTO;
                 })
                 .collect(Collectors.toSet());
@@ -445,4 +466,53 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public void cancelApplication(UUID id) throws UserServiceException {
+        // Récupérer la candidature
+        Application application = applicationRepository.findById(id)
+                .orElseThrow(() -> new UserServiceException("Candidature non trouvée", HttpStatus.NOT_FOUND));
+
+        // Vérifier que l'utilisateur actuel est le propriétaire de la candidature ou un
+        // admin
+        User currentUser = getCurrentUser();
+        boolean isOwner = application.getCandidate().getId().equals(currentUser.getId());
+
+        if (!isOwner && !currentUser.getRole().equals("ADMIN")) {
+            throw new UserServiceException("Vous n'êtes pas autorisé à annuler cette candidature",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        // Vérifier si la candidature peut encore être annulée
+        if (!application.canBeUpdated()) {
+            throw new UserServiceException("Cette candidature ne peut plus être annulée car elle est déjà " +
+                    application.getStatus().toString(), HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // Supprimer tous les documents associés
+            Set<Document> documents = new HashSet<>(application.getDocuments());
+            for (Document document : documents) {
+                // Supprimer le fichier physique
+                Path filePath = Paths.get(UPLOAD_DIR, document.getFilePath());
+                Files.deleteIfExists(filePath);
+
+                // Supprimer le document de la candidature
+                application.removeDocument(document);
+            }
+
+            // Supprimer tous les documents de la base de données
+            documentRepository.deleteAll(documents);
+
+            // Supprimer la candidature
+            applicationRepository.delete(application);
+
+        } catch (IOException e) {
+            throw new UserServiceException("Erreur lors de la suppression des fichiers des documents",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (Exception e) {
+            throw new UserServiceException("Erreur lors de l'annulation de la candidature: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
