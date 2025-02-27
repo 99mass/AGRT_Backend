@@ -4,8 +4,10 @@ import com.unchk.AGRT_Backend.config.JwtProperties;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
+import com.unchk.AGRT_Backend.dto.ApplicationWithUserDTO;
 import com.unchk.AGRT_Backend.dto.DocumentDTO;
 import com.unchk.AGRT_Backend.dto.DocumentResponseDTO;
+import com.unchk.AGRT_Backend.dto.UserDTO;
 import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.enums.DocumentType;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
@@ -427,6 +429,64 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
     }
 
+
+        @Override
+    @Transactional(readOnly = true)
+    public List<ApplicationWithUserDTO> getApplicationsByAnnouncementWithUserInfo(UUID announcementId) {
+        List<Application> applications = applicationRepository.findByAnnouncementId(announcementId);
+        
+        return applications.stream()
+                .map(this::convertToApplicationWithUserDTO)
+                .collect(Collectors.toList());
+    }
+    
+    private ApplicationWithUserDTO convertToApplicationWithUserDTO(Application application) {
+        ApplicationWithUserDTO dto = new ApplicationWithUserDTO();
+        
+        // Copier les informations de base de la candidature
+        dto.setId(application.getId());
+        dto.setCandidateId(application.getCandidate().getId());
+        dto.setAnnouncementId(application.getAnnouncement().getId());
+        dto.setAcademicYearId(application.getAcademicYear().getId());
+        dto.setApplicationType(application.getApplicationType());
+        dto.setStatus(application.getStatus());
+        dto.setRejectionReason(application.getRejectionReason());
+        dto.setCreatedAt(application.getCreatedAt());
+        dto.setUpdatedAt(application.getUpdatedAt());
+        
+        // Convertir les documents
+        Set<DocumentResponseDTO> documentDTOs = application.getDocuments().stream()
+                .map(doc -> {
+                    DocumentResponseDTO docDTO = new DocumentResponseDTO();
+                    docDTO.setId(doc.getId());
+                    docDTO.setFileName(doc.getFileName());
+                    docDTO.setFilePath("/api/files/documents/" + doc.getFilePath());
+                    docDTO.setDocumentType(doc.getDocumentType());
+                    docDTO.setStatus(doc.getStatus());
+                    docDTO.setUploadDate(doc.getUploadDate());
+                    return docDTO;
+                })
+                .collect(Collectors.toSet());
+        
+        dto.setDocuments(documentDTOs);
+        
+        // Convertir les informations utilisateur
+        UserDTO userDTO = new UserDTO();
+        User candidate = application.getCandidate();
+        userDTO.setId(candidate.getId());
+        userDTO.setEmail(candidate.getEmail());
+        userDTO.setFirstName(candidate.getFirstName());
+        userDTO.setLastName(candidate.getLastName());
+        userDTO.setProfilePicture(candidate.getProfilePicture());
+        userDTO.setRole(candidate.getRole());
+        userDTO.setCreatedAt(candidate.getCreatedAt());
+        userDTO.setUpdatedAt(candidate.getUpdatedAt());
+        
+        dto.setCandidate(userDTO);
+        
+        return dto;
+    }
+    
     @Override
     @Transactional(readOnly = true)
     public List<Document> getApplicationDocuments(UUID applicationId) {

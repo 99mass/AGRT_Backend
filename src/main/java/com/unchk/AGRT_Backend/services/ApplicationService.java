@@ -3,6 +3,7 @@ package com.unchk.AGRT_Backend.services;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
+import com.unchk.AGRT_Backend.dto.ApplicationWithUserDTO;
 import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.enums.DocumentType;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
@@ -20,6 +21,8 @@ public interface ApplicationService {
     public ApplicationDetailDTO getApplicationByIdWithDocuments(UUID id);
 
     public List<ApplicationDetailDTO> getApplicationsByAnnouncementWithDocuments(UUID announcementId);
+
+    List<ApplicationWithUserDTO> getApplicationsByAnnouncementWithUserInfo(UUID announcementId);
 
     ApplicationDetailDTO updateApplication(UUID id, ApplicationWithDocumentsDTO updateDTO);
 

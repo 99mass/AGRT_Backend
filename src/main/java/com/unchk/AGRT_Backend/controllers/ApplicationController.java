@@ -11,6 +11,7 @@ import com.unchk.AGRT_Backend.services.ApplicationService;
 import com.unchk.AGRT_Backend.dto.ApplicationDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationDetailDTO;
 import com.unchk.AGRT_Backend.dto.ApplicationWithDocumentsDTO;
+import com.unchk.AGRT_Backend.dto.ApplicationWithUserDTO;
 import com.unchk.AGRT_Backend.enums.ApplicationStatus;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 
@@ -60,14 +61,29 @@ public class ApplicationController {
         }
     }
 
-    @GetMapping("/announcement/{announcementId}")
-    @Operation(summary = "Récupérer toutes les candidatures pour une annonce spécifique")
+    // @GetMapping("/announcement/{announcementId}")
+    // @Operation(summary = "Récupérer toutes les candidatures pour une annonce spécifique")
+    // @PreAuthorize("hasRole('ADMIN')")
+    // public ResponseEntity<List<ApplicationDetailDTO>> getApplicationsByAnnouncement(
+    //         @PathVariable UUID announcementId) {
+    //     try {
+    //         List<ApplicationDetailDTO> applications = applicationService
+    //                 .getApplicationsByAnnouncementWithDocuments(announcementId);
+    //         return ResponseEntity.ok(applications);
+    //     } catch (UserServiceException e) {
+    //         throw new ResponseStatusException(e.getStatus(), e.getMessage());
+    //     }
+    // }
+        @GetMapping("/announcement/{announcementId}")
+    @Operation(summary = "Récupérer toutes les candidatures pour une annonce spécifique avec les informations des candidats")
+    @ApiResponse(responseCode = "200", description = "Liste des candidatures récupérée avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApplicationWithUserDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Annonce non trouvée", content = @Content)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<ApplicationDetailDTO>> getApplicationsByAnnouncement(
+    public ResponseEntity<List<ApplicationWithUserDTO>> getApplicationsByAnnouncement(
             @PathVariable UUID announcementId) {
         try {
-            List<ApplicationDetailDTO> applications = applicationService
-                    .getApplicationsByAnnouncementWithDocuments(announcementId);
+            List<ApplicationWithUserDTO> applications = applicationService
+                    .getApplicationsByAnnouncementWithUserInfo(announcementId);
             return ResponseEntity.ok(applications);
         } catch (UserServiceException e) {
             throw new ResponseStatusException(e.getStatus(), e.getMessage());
