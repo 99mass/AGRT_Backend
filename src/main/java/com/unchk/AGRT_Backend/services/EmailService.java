@@ -116,4 +116,24 @@ public class EmailService {
                 throw new IllegalStateException("Statut de candidature non reconnu : " + newStatus);
         }
     }
+
+    public void sendPasswordResetEmail(String to, String candidateName, String otpCode) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("Réinitialisation de votre mot de passe");
+    
+        String emailContent = String.format(
+                "Bonjour %s,\n\n" +
+                        "Vous avez demandé la réinitialisation de votre mot de passe.\n\n" +
+                        "Voici votre code de réinitialisation : %s\n\n" +
+                        "Ce code est valable pendant 24 heures. Si vous n'avez pas demandé cette réinitialisation, " +
+                        "veuillez ignorer cet email.\n\n" +
+                        "Cordialement,\n" +
+                        "L'équipe de recrutement",
+                candidateName,
+                otpCode);
+    
+        message.setText(emailContent);
+        emailSender.send(message);
+    }
 }
