@@ -1,7 +1,4 @@
-Voici un fichier `README.md` avec des emojis pour rendre les instructions plus visuelles et attrayantes :
-
-markdown
-# 🚀 Getting Started
+# 🚀 Application de Gestion du Recrutement des Tuteurs (BackEnd)
 
 Pour exécuter le backend, vous devez avoir Docker Compose installé sur votre machine. Si vous ne l'avez pas, téléchargez-le [ici](https://docs.docker.com/desktop/setup/install/windows-install/).
 
