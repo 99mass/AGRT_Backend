@@ -15,6 +15,7 @@ import com.unchk.AGRT_Backend.enums.UserRole;
 import com.unchk.AGRT_Backend.exceptions.ErrorMessages;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
 import com.unchk.AGRT_Backend.models.User;
+import com.unchk.AGRT_Backend.repositories.ApplicationRepository;
 import com.unchk.AGRT_Backend.repositories.UserRepository;
 import com.unchk.AGRT_Backend.utils.ProfilePictureValidator;
 
@@ -36,6 +37,9 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ApplicationRepository applicationRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -224,6 +228,19 @@ public class UserService {
 
         // Update password if provided
         if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            // Vérifier que l'ancien mot de passe est fourni
+            if (request.getOldPassword() == null || request.getOldPassword().trim().isEmpty()) {
+                throw new UserServiceException("L'ancien mot de passe est requis pour changer le mot de passe",
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            // Vérifier que l'ancien mot de passe correspond
+            if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+                throw new UserServiceException("L'ancien mot de passe est incorrect",
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            // Si tout est correct, mettre à jour le mot de passe
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
@@ -274,11 +291,16 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUser(String email) {
+    public void deleteUser(String email, String password) {
         // Récupérer l'utilisateur à supprimer
         User userToDelete = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
                         HttpStatus.NOT_FOUND));
+
+        // Vérifier que le mot de passe fourni correspond
+        if (!passwordEncoder.matches(password, userToDelete.getPassword())) {
+            throw new UserServiceException("Mot de passe incorrect", HttpStatus.FORBIDDEN);
+        }
 
         // Récupérer l'authentification courante
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -313,6 +335,80 @@ public class UserService {
         // Vérifier les permissions de suppression
         if (currentUserRole.equals("ADMIN")) {
             // Un ADMIN peut supprimer n'importe quel compte
+            performUserDeletion(userToDelete);
+        } else if (currentUserRole.equals("CANDIDATE")) {
+            // Un CANDIDATE ne peut supprimer que son propre compte
+            if (currentUserEmail == null || !currentUserEmail.equals(email)) {
+                throw new UserServiceException("Vous n'êtes pas autorisé à supprimer ce compte", HttpStatus.FORBIDDEN);
+            }
+            performUserDeletion(userToDelete);
+        } else {
+            // Cas par défaut : accès non autorisé
+            throw new UserServiceException("Vous n'êtes pas autorisé à supprimer ce compte", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    // Méthode auxiliaire pour effectuer la suppression
+    private void performUserDeletion(User userToDelete) {
+        // Supprimer d'abord toutes les applications associées à cet utilisateur
+        applicationRepository.deleteAllByCandidateId(userToDelete.getId());
+        
+        // Ensuite, supprimer l'image de profil si elle existe
+        if (userToDelete.getProfilePicture() != null) {
+            try {
+                fileStorageService.deleteFile(userToDelete.getProfilePicture());
+            } catch (Exception e) {
+                // Log the error, but don't stop the deletion process
+                System.err.println("Erreur lors de la suppression de l'image de profil : " + e.getMessage());
+            }
+        }
+        
+        // Enfin, supprimer l'utilisateur
+        userRepository.delete(userToDelete);
+    }
+
+    @Transactional
+    public void deleteUser2(String email) {
+        // Récupérer l'utilisateur à supprimer
+        User userToDelete = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserServiceException(ErrorMessages.USER_NOT_FOUND.getMessage(),
+                        HttpStatus.NOT_FOUND));
+
+        // Récupérer l'authentification courante
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UserServiceException("Authentification requise",
+                    HttpStatus.UNAUTHORIZED);
+        }
+
+        String token = null;
+        String currentUserRole = "CANDIDATE";
+        String currentUserEmail = null;
+
+        // Extraire le token et les informations de l'utilisateur courant
+        if (authentication.getCredentials() instanceof String) {
+            token = (String) authentication.getCredentials();
+        }
+
+        if (token != null) {
+            try {
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(jwtProperties.getSecretKey())
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody();
+                currentUserRole = claims.get("role", String.class);
+                currentUserEmail = claims.getSubject(); // Assuming email is the subject
+            } catch (Exception e) {
+                throw new UserServiceException("Erreur d'authentification",
+                        HttpStatus.FORBIDDEN);
+            }
+        }
+
+        // Vérifier les permissions de suppression
+        if (currentUserRole.equals("ADMIN")) {
+            // Un ADMIN peut supprimer n'importe quel compte
             userRepository.delete(userToDelete);
         } else if (currentUserRole.equals("CANDIDATE")) {
             // Un CANDIDATE ne peut supprimer que son propre compte
@@ -325,7 +421,8 @@ public class UserService {
                     fileStorageService.deleteFile(userToDelete.getProfilePicture());
                 } catch (Exception e) {
                     // Log the error, but don't stop the deletion process
-                    System.err.println("Erreur lors de la suppression de l'image de profil : " + e.getMessage());
+                    System.err.println("Erreur lors de la suppression de l'image de profil : " +
+                            e.getMessage());
                 }
             }
 
@@ -504,6 +601,11 @@ public class UserService {
         if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
             if (request.getPassword().length() < 6) {
                 errors = ErrorMessages.PASSWORD_TOO_SHORT.getMessage();
+            }
+
+            // Vérifier que l'ancien mot de passe est fourni si un nouveau l'est
+            if (request.getOldPassword() == null || request.getOldPassword().trim().isEmpty()) {
+                errors = "L'ancien mot de passe est requis pour changer le mot de passe";
             }
         }
 

@@ -19,6 +19,9 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID> 
 
     List<Application> findByAcademicYearId(UUID academicYearId);
 
+ 
+    void deleteAllByCandidateId(UUID candidateId);
+
     @Query("SELECT a FROM Application a LEFT JOIN FETCH a.documents WHERE a.id = :id")
     Optional<Application> findByIdWithDocuments(@Param("id") UUID id);
 

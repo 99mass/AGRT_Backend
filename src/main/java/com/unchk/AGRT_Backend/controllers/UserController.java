@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.unchk.AGRT_Backend.dto.PasswordDTO;
 import com.unchk.AGRT_Backend.dto.UserDTO;
 import com.unchk.AGRT_Backend.dto.UserRequestDTO;
 import com.unchk.AGRT_Backend.exceptions.UserServiceException;
@@ -175,14 +176,43 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
 
-    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son ID", responses = {
+    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son email et mot de passe", responses = {
+            @ApiResponse(responseCode = "204", description = "Utilisateur supprimé avec succès"),
+            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé"),
+            @ApiResponse(responseCode = "403", description = "Mot de passe incorrect ou permissions insuffisantes")
+    })
+    @DeleteMapping("/{email}")
+    public ResponseEntity<?> deleteUser(
+            @Parameter(name = "Email de l'utilisateur", description = "Email unique de l'utilisateur", required = true) @PathVariable String email,
+            @RequestBody PasswordDTO passwordDTO) {
+        try {
+            userService.deleteUser(email, passwordDTO.getPassword());
+            return ResponseEntity.noContent().build();
+        } catch (UserServiceException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("status", e.getStatus().value());
+            return ResponseEntity
+                    .status(e.getStatus())
+                    .body(errorResponse);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Une erreur inattendue est survenue");
+            errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
+    }
+
+    @Operation(summary = "Supprimer un utilisateur", description = "Supprime un utilisateur du système à partir de son email", responses = {
             @ApiResponse(responseCode = "204", description = "Utilisateur supprimé avec succès"),
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
     })
-    @DeleteMapping("/{email}")
-    public ResponseEntity<Void> deleteUser(
+    @DeleteMapping("/admins/{email}")
+    public ResponseEntity<Void> deleteUser2(
             @Parameter(name = "ID de l'utilisateur", description = "Identifiant unique de l'utilisateur", required = true) @PathVariable String email) {
-        userService.deleteUser(email);
+        userService.deleteUser2(email);
         return ResponseEntity.noContent().build();
     }
 

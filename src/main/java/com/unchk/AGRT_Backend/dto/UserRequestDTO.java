@@ -10,6 +10,7 @@ import lombok.Data;
 public class UserRequestDTO {
     private String email;
     private String password;
+    private String oldPassword;
     private String firstName;
     private String lastName;
     private String profilePicture;
