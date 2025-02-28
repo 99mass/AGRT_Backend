@@ -1,46 +1,49 @@
-# Getting Started
+Voici un fichier `README.md` avec des emojis pour rendre les instructions plus visuelles et attrayantes :
+
+markdown
+# 🚀 Getting Started
 
 Pour exécuter le backend, vous devez avoir Docker Compose installé sur votre machine. Si vous ne l'avez pas, téléchargez-le [ici](https://docs.docker.com/desktop/setup/install/windows-install/).
 
 Ensuite, ouvrez votre terminal et allez à la racine du projet. Exécutez les commandes suivantes :
 
-- `docker-compose up --build` pour exécuter le code.
-- `docker-compose down` pour arrêter le code.
+- `docker-compose up --build` 🛠️ pour construire et exécuter les conteneurs.
+- `docker-compose down` 🛑 pour arrêter et supprimer les conteneurs.
 
-## Base de Mysql
-La base de données phpMyAdmin est accessible via `http://localhost:8081/`
-- Nom d'utilisateur : `tutoring_user`
-- Mot de passe : `tutoring_password`
+## 🗃️ Base de Données MySQL
 
-## Documentation Swagger
-```
+La base de données phpMyAdmin est accessible via 🌐 [http://localhost:8081/](http://localhost:8081/)
+- **Nom d'utilisateur** : `tutoring_user`
+- **Mot de passe** : `tutoring_password`
+
+## 📚 Documentation Swagger
+
+Accédez à la documentation Swagger pour explorer les API disponibles :
+
 http://localhost:8080/swagger-ui/index.html#/
-```
-
-## Administrateur par défaut
-```
-email= admin@admin.com
-password= admin123
-```
 
 
+## 👨‍💻 Administrateur par défaut
+
+- **Email** : `admin@admin.com`
+- **Mot de passe** : `admin123`
+
+## 🛠️ Exécution avec Maven
+
+Si vous préférez exécuter l'application sans Docker, vous pouvez utiliser Maven :
+
+1. Assurez-vous que MySQL est en cours d'exécution localement avec les mêmes identifiants que ceux définis dans le fichier `docker-compose.yml`.
+2. Exécutez la commande suivante à la racine du projet :
+
+```bash
+mvn spring-boot:run
 ```
-{
-  "candidateId": "5d500db6-55a5-4341-9a06-3dddbb95da20",
-  "announcementId": "c0535d14-4a0f-4241-8236-cdf02a6632bb",
-  "academicYearId": "41875bde-e106-4a19-86ed-f1d26e731b9c",
-  "applicationType": "NEW",
-  "documents": [
-    {
-      "base64Content": "data:application/pdf;base64,...",
-      "originalFilename": "cv.pdf",
-      "documentType": "CV"
-    },
-    {
-      "base64Content": "data:application/pdf;base64,...",
-      "originalFilename": "motivation-letter.pdf",
-      "documentType": "MOTIVATION_LETTER"
-    }
-  ]
-}
-```
+
+L'application sera disponible sur 🌐 [http://localhost:8080](http://localhost:8080).
+
+## 📦 Dépendances
+
+- **Spring Boot** : Framework pour construire des applications Java.
+- **MySQL** : Base de données relationnelle.
+- **phpMyAdmin** : Interface web pour gérer la base de données MySQL.
+- **Docker** : Conteneurisation de l'application.
