@@ -119,7 +119,9 @@ public class JobAnnouncementServiceImpl implements JobAnnouncementService {
             JobAnnouncement announcement = modelMapper.map(announcementDTO, JobAnnouncement.class);
             announcement.setAcademicYear(academicYear);
             announcement.setCreatedBy(currentUser); // Utiliser l'utilisateur courant
-            announcement.setStatus(AnnouncementStatus.DRAFT);
+         
+            announcement.setStatus(announcementDTO.getStatus() != null ? announcementDTO.getStatus() : AnnouncementStatus.PUBLISHED);
+
 
             JobAnnouncement savedAnnouncement = announcementRepository.save(announcement);
             return modelMapper.map(savedAnnouncement, JobAnnouncementDTO.class);
